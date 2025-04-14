@@ -4449,20 +4449,6 @@ def construct_search_url(
 def render_scraping_tab():
     """Render the scraping tab with a clean 2x2 filter layout and page range selection"""
     st.subheader("Scrape PFD Reports")
-    st.markdown(
-        """
-        Comprehensive search tool for Prevention of Future Deaths (PFD) reports from the UK Judiciary website.
-
-        - Extract detailed PFD reports with metadata, full content, and associated PDFs
-        - Filtering by keywords, categories, and date ranges
-        - Export options in CSV and Excel formats
-
-        Handling Large Result Sets: For extensive search results, use the 'Start page' and 'End page' number inputs to download reports in manageable batches. For instance, with 20 pages of results, consider downloading pages 1-5, then 6-10 
-        to manage data efficiently and avoid potential scraping limitations.
-
-        Configure your search parameters below to retrieve judicial reports.
-        """
-    )
 
     # Initialize default values if not in session state
     if "init_done" not in st.session_state:
@@ -4653,15 +4639,6 @@ def render_scraping_tab():
 def render_topic_summary_tab(data: pd.DataFrame) -> None:
     """Topic analysis with weighting schemes and essential controls"""
     st.subheader("Topic Analysis & Summaries")
-    st.markdown(
-        """
-        Basic thematic analysis of Prevention of Future Deaths (PFD) reports.
-        - Automatically identify key themes across document collections
-        - Cluster similar documents (adjust the parameters to identify optimal clusters)
-        - Generate summaries for each identified theme
-        - Visualise relationships between key concepts and topics
-    """
-    )
 
     # Show previous results if available
     if "topic_model" in st.session_state and st.session_state.topic_model is not None:
@@ -7403,18 +7380,10 @@ def render_summary_tab(cluster_results: Dict, original_data: pd.DataFrame) -> No
         st.markdown("---")
 
 
+# Modify the render_bert_analysis_tab function to remove duplicate description
 def render_bert_analysis_tab(data: pd.DataFrame = None):
     """Modified render_bert_analysis_tab function without password protection"""
-    st.subheader("AI-based Concept/Theme Extraction and Analysis")
-    st.markdown(
-            """
-            Advanced AI-powered thematic analysis.
-            - Upload the merged Prevention of Future Deaths (PFD) reports file from step (2) 
-            - Automatic extraction of important themes from Prevention of Future Deaths (PFD) reports (using 4 framedworks)
-            - Download detailed results in structured tables
-            - Download colour highlighted sentences based on theme colours in a html report
-            """
-        )
+    
     # Ensure the bert_results dictionary exists in session state
     if "bert_results" not in st.session_state:
         st.session_state.bert_results = {}
@@ -7647,8 +7616,304 @@ def render_bert_analysis_tab(data: pd.DataFrame = None):
                 )
             else:
                 st.warning("HTML report not available")
-                
+
 def render_analysis_tab(data: pd.DataFrame = None):
+    """Render the analysis tab with improved filters, file upload functionality, and analysis sections"""
+    st.header("Reports Analysis")
+    
+    # Add file upload section at the top
+    uploaded_file = st.file_uploader(
+        "Upload CSV or Excel file", 
+        type=['csv', 'xlsx'],
+        help="Upload previously exported data"
+    )
+    
+    if uploaded_file is not None:
+        try:
+            if uploaded_file.name.endswith('.csv'):
+                data = pd.read_csv(uploaded_file)
+            else:
+                data = pd.read_excel(uploaded_file)
+            
+            # Process uploaded data
+            data = process_scraped_data(data)
+            st.success("File uploaded and processed successfully!")
+            
+            # Update session state
+            st.session_state.uploaded_data = data.copy()
+            st.session_state.data_source = 'uploaded'
+            st.session_state.current_data = data.copy()
+        
+        except Exception as e:
+            st.error(f"Error uploading file: {str(e)}")
+            logging.error(f"File upload error: {e}", exc_info=True)
+            return
+    
+    # Use either uploaded data or passed data
+    if data is None:
+        data = st.session_state.get('current_data')
+    
+    # Show a permanent message if no data is available
+    # Note: We don't return early here anymore, so the description remains visible
+    if data is None or len(data) == 0:
+        st.warning("No data available. Please upload a file or scrape reports first.")
+        # Return here ONLY if no data at all
+        if data is None:
+            return
+        
+    try:
+        # Continue only if we have data
+        if data is not None and len(data) > 0:
+            # Get date range for the data
+            min_date = data['date_of_report'].min().date()
+            max_date = data['date_of_report'].max().date()
+            
+            # Filters sidebar
+            with st.sidebar:
+                st.header("Filters")
+                
+                # Date Range
+                with st.expander("📅 Date Range", expanded=True):
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        start_date = st.date_input(
+                            "From",
+                            value=min_date,
+                            min_value=min_date,
+                            max_value=max_date,
+                            key="start_date_filter",
+                            format="DD/MM/YYYY"
+                        )
+                    with col2:
+                        end_date = st.date_input(
+                            "To",
+                            value=max_date,
+                            min_value=min_date,
+                            max_value=max_date,
+                            key="end_date_filter",
+                            format="DD/MM/YYYY"
+                        )
+                
+                # Document Type Filter
+                doc_type = st.multiselect(
+                    "Document Type",
+                    ["Report", "Response"],
+                    default=[],
+                    key="doc_type_filter",
+                    help="Filter by document type"
+                )
+                
+                # Reference Number
+                ref_numbers = sorted(data['ref'].dropna().unique())
+                selected_refs = st.multiselect(
+                    "Reference Numbers",
+                    options=ref_numbers,
+                    key="ref_filter"
+                )
+                
+                # Deceased Name
+                deceased_search = st.text_input(
+                    "Deceased Name",
+                    key="deceased_filter",
+                    help="Enter partial or full name"
+                )
+                
+                # Coroner Name
+                coroner_names = sorted(data['coroner_name'].dropna().unique())
+                selected_coroners = st.multiselect(
+                    "Coroner Names",
+                    options=coroner_names,
+                    key="coroner_filter"
+                )
+                
+                # Coroner Area
+                coroner_areas = sorted(data['coroner_area'].dropna().unique())
+                selected_areas = st.multiselect(
+                    "Coroner Areas",
+                    options=coroner_areas,
+                    key="areas_filter"
+                )
+                
+                # Categories
+                all_categories = set()
+                for cats in data['categories'].dropna():
+                    if isinstance(cats, list):
+                        all_categories.update(cats)
+                selected_categories = st.multiselect(
+                    "Categories",
+                    options=sorted(all_categories),
+                    key="categories_filter"
+                )
+                
+                # Reset Filters Button
+                if st.button("🔄 Reset Filters"):
+                    for key in st.session_state:
+                        if key.endswith('_filter'):
+                            del st.session_state[key]
+                    st.rerun()
+
+            # Apply filters
+            filtered_df = data.copy()
+
+            # Date filter
+            if start_date and end_date:
+                filtered_df = filtered_df[
+                    (filtered_df['date_of_report'].dt.date >= start_date) &
+                    (filtered_df['date_of_report'].dt.date <= end_date)
+                ]
+
+            # Document type filter
+            if doc_type:
+                filtered_df = filtered_df[filtered_df.apply(is_response, axis=1)]
+
+            # Reference number filter
+            if selected_refs:
+                filtered_df = filtered_df[filtered_df['ref'].isin(selected_refs)]
+
+            if deceased_search:
+                filtered_df = filtered_df[
+                    filtered_df['deceased_name'].fillna('').str.contains(
+                        deceased_search, 
+                        case=False, 
+                        na=False
+                    )
+                ]
+
+            if selected_coroners:
+                filtered_df = filtered_df[filtered_df['coroner_name'].isin(selected_coroners)]
+
+            if selected_areas:
+                filtered_df = filtered_df[filtered_df['coroner_area'].isin(selected_areas)]
+
+            if selected_categories:
+                filtered_df = filtered_df[
+                    filtered_df['categories'].apply(
+                        lambda x: bool(x) and any(cat in x for cat in selected_categories)
+                    )
+                ]
+
+            # Show active filters
+            active_filters = []
+            if start_date != min_date or end_date != max_date:
+                active_filters.append(f"Date: {start_date.strftime('%d/%m/%Y')} to {end_date.strftime('%d/%m/%Y')}")
+            if doc_type and doc_type != ["Report", "Response"]:
+                active_filters.append(f"Document Types: {', '.join(doc_type)}")
+            if selected_refs:
+                active_filters.append(f"References: {', '.join(selected_refs)}")
+            if deceased_search:
+                active_filters.append(f"Deceased name contains: {deceased_search}")
+            if selected_coroners:
+                active_filters.append(f"Coroners: {', '.join(selected_coroners)}")
+            if selected_areas:
+                active_filters.append(f"Areas: {', '.join(selected_areas)}")
+            if selected_categories:
+                active_filters.append(f"Categories: {', '.join(selected_categories)}")
+
+            if active_filters:
+                st.info("Active filters:\n" + "\n".join(f"• {filter_}" for filter_ in active_filters))
+
+            # Display results
+            st.subheader("Results")
+            st.write(f"Showing {len(filtered_df)} of {len(data)} reports")
+
+            if len(filtered_df) > 0:
+                # Display the dataframe
+                st.dataframe(
+                    filtered_df,
+                    column_config={
+                        "URL": st.column_config.LinkColumn("Report Link"),
+                        "date_of_report": st.column_config.DateColumn(
+                            "Date of Report",
+                            format="DD/MM/YYYY"
+                        ),
+                        "categories": st.column_config.ListColumn("Categories"),
+                        "Document Type": st.column_config.TextColumn(
+                            "Document Type",
+                            help="Type of document based on PDF filename"
+                        )
+                    },
+                    hide_index=True
+                )
+
+                # Create tabs for different analyses
+                st.markdown("---")
+                quality_tab, temporal_tab, distribution_tab = st.tabs([
+                    "📊 Data Quality Analysis",
+                    "📅 Temporal Analysis",
+                    "📍 Distribution Analysis"
+                ])
+
+                # Data Quality Analysis Tab
+                with quality_tab:
+                    analyze_data_quality(filtered_df)
+
+                # Temporal Analysis Tab
+                with temporal_tab:
+                    # Timeline of reports
+                    st.subheader("Reports Timeline")
+                    plot_timeline(filtered_df)
+                    
+                    # Monthly distribution
+                    st.subheader("Monthly Distribution")
+                    plot_monthly_distribution(filtered_df)
+                    
+                    # Year-over-year comparison
+                    st.subheader("Year-over-Year Comparison")
+                    plot_yearly_comparison(filtered_df)
+                    
+                    # Seasonal patterns
+                    st.subheader("Seasonal Patterns")
+                    seasonal_counts = filtered_df['date_of_report'].dt.month.value_counts().sort_index()
+                    month_names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
+                                 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+                    fig = px.line(
+                        x=month_names,
+                        y=[seasonal_counts.get(i, 0) for i in range(1, 13)],
+                        markers=True,
+                        labels={'x': 'Month', 'y': 'Number of Reports'},
+                        title='Seasonal Distribution of Reports'
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
+
+                # Distribution Analysis Tab
+                with distribution_tab:
+                        st.subheader("Reports by Category")
+                        plot_category_distribution(filtered_df)
+                        st.subheader("Reports by Coroner Area")
+                        plot_coroner_areas(filtered_df)
+
+                # Export options
+                st.markdown("---")
+                st.subheader("Export Options")
+                col1, col2 = st.columns(2)
+                
+                # CSV Export
+                with col1:
+                    csv = filtered_df.to_csv(index=False).encode('utf-8')
+                    st.download_button(
+                        "📥 Download Results (CSV)",
+                        csv,
+                        "filtered_reports.csv",
+                        "text/csv"
+                    )
+                
+                # Excel Export
+                with col2:
+                    excel_data = export_to_excel(filtered_df)
+                    st.download_button(
+                        "📥 Download Results (Excel)",
+                        excel_data,
+                        "filtered_reports.xlsx",
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    )
+            else:
+                st.warning("No data matches the selected filters.")
+
+    except Exception as e:
+        st.error(f"An error occurred: {str(e)}")
+        logging.error(f"Analysis error: {e}", exc_info=True)
+        
+def render_analysis_tab2(data: pd.DataFrame = None):
     """Render the analysis tab with improved filters, file upload functionality, and analysis sections"""
     st.header("Reports Analysis")
     st.markdown(
@@ -7986,16 +8251,216 @@ def check_app_password():
     
     return False
 
-
 def render_bert_file_merger():
-    """Render the BERT file merger tab in the Streamlit app."""
+    """Render the BERT file merger tab in the Streamlit app with custom initialization."""
     # Create an instance of the analyzer
     analyzer = BERTResultsAnalyzer()
     
-    # Render the analyzer UI
-    analyzer.render_analyzer_ui()
+    # Skip the standard render_analyzer_ui and call the file upload directly
+    # This avoids the duplicate header and description
+    analyzer._render_multiple_file_upload()
+
+
 
 def main():
+    """Updated main application entry point."""
+    initialize_session_state()
+    
+    # Check authentication first
+    if not check_app_password():
+        # Render the footer even when not authenticated
+        render_footer()
+        return
+    
+    # Only show the main app content if authenticated
+    st.title("UK Judiciary PFD Reports Analysis")
+    
+    # Add the main descriptive text here, before any tab selection
+    st.markdown(
+        """
+        This application analyses Prevention of Future Deaths (PFD) reports from the UK Judiciary website.
+        You can scrape new reports, analyse existing data, and explore thematic patterns.
+        """
+    )
+
+    # Updated tab selection with the new BERT File Merger tab
+    current_tab = st.radio(
+        "Select section:",
+        [
+            "(1)🔍 Scrape Reports",
+            "(2)📂 Scraped File Preparation",
+            "(3)📊 Scraped File Analysis",
+            "(4)📝 Topic Analysis & Summaries", 
+            "(5)🔬 Concept Annotation",
+        ],
+        label_visibility="collapsed",
+        horizontal=True,
+        key="main_tab_selector",
+    )
+    st.markdown("---")
+
+    try:
+        if current_tab == "(1)🔍 Scrape Reports":
+            # Add tab-specific description here
+            st.markdown(
+                """
+                Search tool for Prevention of Future Deaths (PFD) reports from the UK Judiciary website.
+
+                - Extract detailed PFD reports with metadata, full content, and associated PDFs
+                - Filtering by keywords, categories, and date ranges
+                - Export options in CSV and Excel formats
+
+                Handling Large Result Sets: For extensive search results, use the 'Start page' and 'End page' number inputs to download reports in manageable batches.
+                """
+            )
+            render_scraping_tab()
+        
+        elif current_tab == "(2)📂 Scraped File Preparation":
+            # Add tab-specific description here
+            st.markdown(
+                """
+                This tool merges multiple scraped files into a single dataset. It prepares the data for steps (3) - (5).
+                
+                - Run this step even if you only have one scraped file. This step extracts the year and applies other processing.
+                - Combine data from multiple CSV or Excel files (files starting with pfd_reports_scraped_reportID_)
+                - Extract missing concerns from PDF content and fill empty Content fields
+                - Extract year information from date fields
+                - Remove duplicate records
+                - Export full or reduced datasets with essential columns
+                """
+            )
+            render_bert_file_merger()
+        
+        elif current_tab == "(3)📊 Scraped File Analysis":
+            # Add tab-specific description here
+            st.markdown(
+                """
+                Analyse and explore your prepared Prevention of Future Deaths (PFD) reports.
+                - Upload processed files from Scraped File Preparation (file starting with merged_)
+                - Data visualisation
+                - Report insights and export options
+
+                Upload your prepared CSV or Excel file from Step 2 to begin analysis.
+                """
+            )
+            if not validate_data_state():
+                handle_no_data_state("analysis")
+            else:
+                render_analysis_tab(st.session_state.current_data)
+        
+        elif current_tab == "(4)📝 Topic Analysis & Summaries":
+            # Add tab-specific description here
+            st.markdown(
+                """
+                Basic thematic analysis of Prevention of Future Deaths (PFD) reports.
+                - Automatically identify key themes across document collections
+                - Cluster similar documents (adjust the parameters to identify optimal clusters)
+                - Generate summaries for each identified theme
+                - Visualise relationships between key concepts and topics
+                """
+            )
+            if not validate_data_state():
+                handle_no_data_state("topic_summary")
+            else:
+                render_topic_summary_tab(st.session_state.current_data)
+        
+        elif current_tab == "(5)🔬 Concept Annotation":
+            # Add tab-specific description here
+            st.markdown(
+                """
+                Advanced AI-powered thematic analysis.
+                - Upload the merged Prevention of Future Deaths (PFD) reports file from step (2) 
+                - Automatic extraction of important themes from Prevention of Future Deaths (PFD) reports (using 4 frameworks)
+                - Download detailed results in structured tables
+                - Download colour highlighted sentences based on theme colours in a html report
+                """
+            )
+            render_bert_analysis_tab(st.session_state.current_data)
+
+        # Sidebar data management
+        with st.sidebar:
+            st.header("Data Management")
+        
+            if hasattr(st.session_state, "data_source"):
+                st.info(f"Current data: {st.session_state.data_source}")
+            
+            if st.button("Clear All Data"):
+                # Define a comprehensive list of keys to clear
+                keys_to_clear = [
+                    # Core data keys
+                    "current_data",
+                    "scraped_data", 
+                    "uploaded_data",
+                    "topic_model",
+                    "data_source",
+                    
+                    # BERT-specific keys
+                    "bert_results",
+                    "bert_initialized",
+                    "bert_merged_data",
+                    
+                    # File upload keys
+                    "bert_file_uploader",
+                    "bert_content_column",
+                    "bert_analysis_type",
+                    "bert_selected_indices",
+                    "bert_similarity_threshold",
+                    
+                    # BERT merger settings keys
+                    "drop_duplicates_static",
+                    "extract_year_static",
+                    "extract_from_pdf_static",
+                    "fill_empty_content_static",
+                    "duplicate_columns_static",
+                    "merge_files_button_static",
+                    
+                    # Analysis filter keys
+                    "start_date_filter",
+                    "end_date_filter",
+                    "doc_type_filter",
+                    "ref_filter",
+                    "deceased_filter",
+                    "coroner_filter",
+                    "areas_filter",
+                    "categories_filter",
+                ]
+                
+                # Clear each key if it exists
+                for key in keys_to_clear:
+                    if key in st.session_state:
+                        del st.session_state[key]
+                
+                # Force re-initialization of key values
+                st.session_state.current_data = None
+                st.session_state.uploaded_data = None
+                st.session_state.scraped_data = None
+                st.session_state.data_source = None
+                st.session_state.bert_results = {}
+                st.session_state.bert_initialized = False
+                st.session_state.bert_merged_data = None
+                
+                # Increment reset counter to force new file uploader keys
+                if "reset_counter" not in st.session_state:
+                    st.session_state.reset_counter = 0
+                st.session_state.reset_counter += 1
+                
+                # Give feedback and rerun
+                st.success("All data cleared successfully")
+                st.rerun()
+
+            # Add logout button
+            if st.button("Logout"):
+                st.session_state.authenticated = False
+                st.rerun()
+
+        render_footer()
+
+    except Exception as e:
+        handle_error(e)
+        
+        # Render footer even when an exception occurs
+        render_footer()
+def main2():
     """Updated main application entry point."""
     initialize_session_state()
     
