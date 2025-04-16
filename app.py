@@ -8545,10 +8545,10 @@ def render_theme_analysis_dashboard(data: pd.DataFrame = None):
     
     # If no data is available after upload
     if data is None or len(data) == 0:
-        with st.expander("💡 How to Use This Tool"):
+        with st.expander("💡 How to get theme analysis data?"):
             st.markdown("""
-            ### To get theme analysis data:
-            
+            #### To get theme analysis data:
+        
             1. **Upload Existing Results**
                - Use the file uploader above to load previously saved theme analysis results
             
