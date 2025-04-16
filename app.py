@@ -1,7 +1,7 @@
 import streamlit as st
 import pyLDAvis 
 import pyLDAvis.sklearn 
-import pandas as pd
+import pandas as pd 
 import numpy as np
 from datetime import datetime, timedelta
 import re
@@ -15,6 +15,11 @@ import logging
 import os
 import zipfile
 import unicodedata
+import nltk
+import random
+import string
+import traceback
+import torch
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 import plotly.express as px
@@ -24,22 +29,15 @@ from sklearn.decomposition import LatentDirichletAllocation
 from sklearn.preprocessing import normalize
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.cluster import AgglomerativeClustering
-from sklearn.metrics import silhouette_score  # Added for semantic clustering
 import networkx as nx
 from nltk.tokenize import word_tokenize
 from nltk.corpus import stopwords
-from collections import Counter
+from collections import Counter, defaultdict
 from bs4 import BeautifulSoup, Tag
 import json  # Added for JSON export functionality
-import nltk
-
 nltk.download("punkt")
 nltk.download("stopwords")
 nltk.download("averaged_perceptron_tagger")
-import random
-import string
-import traceback
-from datetime import datetime
 from openpyxl.utils import get_column_letter
 from sklearn.base import BaseEstimator, TransformerMixin
 import scipy.sparse as sp
@@ -50,21 +48,14 @@ from sklearn.metrics import (
     davies_bouldin_score,
 )
 from transformers import AutoTokenizer, AutoModel
-import torch
-import numpy as np
-from sklearn.metrics.pairwise import cosine_similarity
-import re
-from collections import Counter
-from tqdm import tqdm
-from collections import defaultdict  
-
-import streamlit as st
-import pandas as pd
-import numpy as np
-import io
-from datetime import datetime
-import logging
-
+from tqdm import tqdm 
+from matplotlib.backends.backend_pdf import PdfPages
+import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
+import tempfile
+from matplotlib.colors import LinearSegmentedColormap
+from matplotlib.patches import Patch
+  
 ######################################
 class BERTResultsAnalyzer:
     """Enhanced class for merging BERT theme analysis results files with specific column outputs and year extraction."""
@@ -1049,7 +1040,7 @@ class ThemeAnalyzer:
     def __init__(self, model_name="emilyalsentzer/Bio_ClinicalBERT"):
         """Initialize the BERT-based theme analyzer with sentence highlighting capabilities"""
         # Initialize transformer model and tokenizer
-        st.info("Loading BERT model and tokenizer... This may take a moment.")
+        st.info("Loading annotation model and tokenizer... This may take a moment.")
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
         self.model = AutoModel.from_pretrained(model_name)
 
@@ -1451,8 +1442,8 @@ class ThemeAnalyzer:
         Create a single integrated HTML file with all highlighted records, themes, and framework information
         that can be easily converted to PDF
         """
-        from collections import defaultdict
-        from datetime import datetime
+    
+    
     
         # Map report IDs to their themes
         report_themes = defaultdict(list)
@@ -1489,7 +1480,7 @@ class ThemeAnalyzer:
             <!DOCTYPE html>
             <html>
             <head>
-                <title>BERT Theme Analysis Report</title>
+                <title>Theme Analysis Report</title>
                 <meta charset="UTF-8">
                 <meta name="viewport" content="width=device-width, initial-scale=1">
                 <style>
@@ -1651,7 +1642,7 @@ class ThemeAnalyzer:
             </head>
             <body>
                 <div class="report-header">
-                    <h1>BERT Theme Analysis Results</h1>
+                    <h1>Theme Analysis Results</h1>
                     <p>Generated on """ + datetime.now().strftime("%d %B %Y, %H:%M") + """</p>
                 </div>
                 
@@ -2690,6 +2681,7 @@ class ThemeAnalyzer:
         ]
 
     # New methods to add
+
     def _get_confidence_label(self, score):
         """Convert numerical score to confidence label"""
         if score >= 0.7:
@@ -2699,34 +2691,33 @@ class ThemeAnalyzer:
         else:
             return "Low"
 
-    # First, we need to modify the theme analyzer's create_detailed_results method
-    # to store the matched sentences with each theme detection
 
     def create_detailed_results(self, data, content_column="Content"):
         """
         Analyze multiple documents and create detailed results with progress tracking.
-
+        Enhanced to include additional metadata (coroner_name, coroner_area, year).
+    
         Args:
             data (pd.DataFrame): DataFrame containing documents
             content_column (str): Name of the column containing text to analyze
-
+    
         Returns:
             Tuple[pd.DataFrame, Dict]: (Results DataFrame, Dictionary of highlighted texts)
         """
         import streamlit as st
-
+    
         results = []
         highlighted_texts = {}
-
+    
         # Create progress tracking elements
         progress_bar = st.progress(0)
         status_text = st.empty()
         doc_count_text = st.empty()
-
+    
         # Calculate total documents to process
         total_docs = len(data)
         doc_count_text.text(f"Processing 0/{total_docs} documents")
-
+    
         # Process each document
         for idx, (i, row) in enumerate(data.iterrows()):
             # Update progress
@@ -2735,26 +2726,26 @@ class ThemeAnalyzer:
             status_text.text(
                 f"Analyzing document {idx + 1}/{total_docs}: {row.get('Title', f'Document {i}')}"
             )
-
+    
             # Skip empty content
             if pd.isna(row[content_column]) or row[content_column] == "":
                 continue
-
+    
             content = str(row[content_column])
-
+    
             # Analyze themes and get highlights
             framework_themes, theme_highlights = self.analyze_document(content)
-
+    
             # Create highlighted HTML for this document
             highlighted_html = self.create_highlighted_html(content, theme_highlights)
             highlighted_texts[i] = highlighted_html
-
+    
             # Store results for each theme
             theme_count = 0
             for framework_name, themes in framework_themes.items():
                 for theme in themes:
                     theme_count += 1
-
+    
                     # Extract matched sentences for this theme
                     matched_sentences = []
                     theme_key = f"{framework_name}_{theme['theme']}"
@@ -2766,37 +2757,55 @@ class ThemeAnalyzer:
                             sentence,
                         ) in theme_highlights[theme_key]:
                             matched_sentences.append(sentence)
-
+    
                     # Join sentences if there are any
                     matched_text = (
                         "; ".join(matched_sentences) if matched_sentences else ""
                     )
-
-                    results.append(
-                        {
-                            "Record ID": i,
-                            "Title": row.get("Title", f"Document {i}"),
-                            "Framework": framework_name,
-                            "Theme": theme["theme"],
-                            "Confidence": self._get_confidence_label(
-                                theme["combined_score"]
-                            ),
-                            "Combined Score": theme["combined_score"],
-                            "Semantic_Similarity": theme["semantic_similarity"],
-                            "Matched Keywords": theme["matched_keywords"],
-                            "Matched Sentences": matched_text,  # Add matched sentences to results
-                        }
-                    )
-
-            # Update documents processed count with theme info
-            doc_count_text.text(
-                f"Processed {idx + 1}/{total_docs} documents. Found {theme_count} themes in current document."
-            )
-
+    
+                    # Prepare the base result dictionary with theme information
+                    result_dict = {
+                        "Record ID": i,
+                        "Title": row.get("Title", f"Document {i}"),
+                        "Framework": framework_name,
+                        "Theme": theme["theme"],
+                        "Confidence": self._get_confidence_label(
+                            theme["combined_score"]
+                        ),
+                        "Combined Score": theme["combined_score"],
+                        "Semantic_Similarity": theme["semantic_similarity"],
+                        "Matched Keywords": theme["matched_keywords"],
+                        "Matched Sentences": matched_text,
+                    }
+                    
+                    # Add additional metadata fields from the original data
+                    # Only add if they exist in the input data
+                    if "coroner_name" in row:
+                        result_dict["coroner_name"] = row.get("coroner_name", "")
+                    
+                    if "coroner_area" in row:
+                        result_dict["coroner_area"] = row.get("coroner_area", "")
+                    
+                    if "year" in row:
+                        result_dict["year"] = row.get("year", "")
+                    elif "Year" in row:
+                        result_dict["year"] = row.get("Year", "")
+                    
+                    # Add date_of_report if available
+                    if "date_of_report" in row:
+                        result_dict["date_of_report"] = row.get("date_of_report", "")
+    
+                    results.append(result_dict)
+    
+                # Update documents processed count with theme info
+                doc_count_text.text(
+                    f"Processed {idx + 1}/{total_docs} documents. Found {theme_count} themes in current document."
+                )
+    
         # Clear progress indicators
         progress_bar.empty()
         status_text.empty()
-
+    
         # Final count update
         if results:
             doc_count_text.text(
@@ -2806,13 +2815,11 @@ class ThemeAnalyzer:
             doc_count_text.text(
                 f"Completed analysis, but no themes were identified in the documents."
             )
-
+    
         # Create results DataFrame
         results_df = pd.DataFrame(results) if results else pd.DataFrame()
-
+    
         return results_df, highlighted_texts
-
-    # Now let's modify the export_to_excel function to ensure it includes matched sentences
 
     def create_comprehensive_pdf(
         self, results_df, highlighted_texts, output_filename=None
@@ -2828,16 +2835,6 @@ class ThemeAnalyzer:
         Returns:
             str: Path to the created PDF file
         """
-        from matplotlib.backends.backend_pdf import PdfPages
-        from datetime import datetime
-        import matplotlib.pyplot as plt
-        import matplotlib.gridspec as gridspec
-        import pandas as pd
-        import numpy as np
-        import os
-        import tempfile
-        from matplotlib.colors import LinearSegmentedColormap
-        from matplotlib.patches import Patch
 
         # Generate default filename if not provided
         if output_filename is None:
@@ -2855,7 +2852,7 @@ class ThemeAnalyzer:
             plt.text(
                 0.5,
                 0.6,
-                "BERT Theme Analysis Report",
+                "Theme Analysis Report",
                 fontsize=28,
                 ha="center",
                 va="center",
@@ -3051,7 +3048,7 @@ class ThemeAnalyzer:
                         f"{framework_name} Framework Analysis",
                         fontsize=20,
                         y=0.95,
-                        weight="bold",
+                        weight="bold", 
                     )
 
                     # Theme counts
@@ -3173,23 +3170,25 @@ class ThemeAnalyzer:
                 color_idx = i % len(self.theme_colors)
                 self.theme_color_map[theme_key] = self.theme_colors[color_idx]
 
+
     def export_to_excel(df: pd.DataFrame) -> bytes:
         """
-        Export DataFrame to Excel bytes with proper formatting, including matched sentences
+        Export BERT results DataFrame to Excel bytes with proper formatting,
+        including additional metadata columns.
         """
         try:
             if df is None or len(df) == 0:
                 raise ValueError("No data available to export")
-
+    
             # Create clean copy for export
             df_export = df.copy()
-
+    
             # Format dates to UK format
             if "date_of_report" in df_export.columns:
                 df_export["date_of_report"] = df_export["date_of_report"].dt.strftime(
                     "%d/%m/%Y"
                 )
-
+    
             # Handle list columns (like categories)
             for col in df_export.columns:
                 if df_export[col].dtype == "object":
@@ -3200,22 +3199,28 @@ class ThemeAnalyzer:
                         if pd.notna(x)
                         else ""
                     )
-
+    
             # Create output buffer
             output = io.BytesIO()
-
+    
             # Write to Excel
             with pd.ExcelWriter(output, engine="openpyxl") as writer:
-                df_export.to_excel(writer, sheet_name="Reports", index=False)
-
+                df_export.to_excel(writer, sheet_name="BERT Results", index=False)
+    
                 # Get the worksheet
-                worksheet = writer.sheets["Reports"]
-
+                worksheet = writer.sheets["BERT Results"]
+    
                 # Auto-adjust column widths
                 for idx, col in enumerate(df_export.columns, 1):
                     # Set larger width for Matched Sentences column
                     if col == "Matched Sentences":
                         worksheet.column_dimensions[get_column_letter(idx)].width = 80
+                    # Set wider width for coroner_area (often long)
+                    elif col == "coroner_area":
+                        worksheet.column_dimensions[get_column_letter(idx)].width = 40
+                    # Set appropriate width for coroner_name
+                    elif col == "coroner_name":
+                        worksheet.column_dimensions[get_column_letter(idx)].width = 30
                     else:
                         max_length = max(
                             df_export[col].astype(str).apply(len).max(),
@@ -3226,13 +3231,13 @@ class ThemeAnalyzer:
                         worksheet.column_dimensions[
                             column_letter
                         ].width = adjusted_width
-
+    
                 # Add filters to header row
                 worksheet.auto_filter.ref = worksheet.dimensions
-
+    
                 # Freeze the header row
                 worksheet.freeze_panes = "A2"
-
+    
                 # Set wrap text for Matched Sentences column
                 matched_sent_col = next(
                     (
@@ -3249,15 +3254,17 @@ class ThemeAnalyzer:
                         cell.alignment = cell.alignment.copy(wrapText=True)
                         # Set row height to accommodate wrapped text
                         worksheet.row_dimensions[row].height = 60
-
+    
             # Get the bytes value
             output.seek(0)
             return output.getvalue()
-
+    
         except Exception as e:
             logging.error(f"Error exporting to Excel: {e}", exc_info=True)
             raise Exception(f"Failed to export data to Excel: {str(e)}")
+        
 
+    
 class BM25Vectorizer(BaseEstimator, TransformerMixin):
     """BM25 vectorizer implementation"""
 
@@ -4275,8 +4282,491 @@ def get_category_slug(category: str) -> str:
     logging.info(f"Generated category slug: {slug} from category: {category}")
     return slug
 
-
 def scrape_pfd_reports(
+    keyword: Optional[str] = None,
+    category: Optional[str] = None,
+    order: str = "relevance",
+    start_page: int = 1,
+    end_page: Optional[int] = None,
+    auto_save_batches: bool = True,
+    batch_size: int = 5
+) -> List[Dict]:
+    """
+    Scrape PFD reports with enhanced progress tracking, proper pagination, and automatic batch saving
+    
+    Args:
+        keyword: Optional keyword to search for
+        category: Optional category to filter by
+        order: Sort order ("relevance", "desc", "asc")
+        start_page: First page to scrape
+        end_page: Last page to scrape (None for all pages)
+        auto_save_batches: Whether to automatically save batches of results
+        batch_size: Number of pages per batch
+        
+    Returns:
+        List of report dictionaries
+    """
+    all_reports = []
+    base_url = "https://www.judiciary.uk/"
+    batch_number = 1
+
+    try:
+        # Initialize progress tracking
+        progress_bar = st.progress(0)
+        status_text = st.empty()
+        report_count_text = st.empty()
+        batch_status = st.empty()
+
+        # Validate and prepare category
+        category_slug = None
+        if category:
+            category_slug = (
+                category.lower()
+                .replace(" ", "-")
+                .replace("&", "and")
+                .replace("--", "-")
+                .strip("-")
+            )
+            logging.info(f"Using category: {category}, slug: {category_slug}")
+
+        # Construct initial search URL
+        base_search_url = construct_search_url(
+            base_url=base_url,
+            keyword=keyword,
+            category=category,
+            category_slug=category_slug,
+        )
+
+        st.info(f"Searching at: {base_search_url}")
+
+        # Get total pages and results count
+        total_pages, total_results = get_total_pages(base_search_url)
+
+        if total_results == 0:
+            st.warning("No results found matching your search criteria")
+            return []
+
+        st.info(f"Found {total_results} matching reports across {total_pages} pages")
+
+        # Apply page range limits
+        start_page = max(1, start_page)  # Ensure start_page is at least 1
+        if end_page is None:
+            end_page = total_pages
+        else:
+            end_page = min(
+                end_page, total_pages
+            )  # Ensure end_page doesn't exceed total_pages
+
+        if start_page > end_page:
+            st.warning(f"Invalid page range: {start_page} to {end_page}")
+            return []
+
+        st.info(f"Scraping pages {start_page} to {end_page}")
+        
+        # Variables for batch processing
+        batch_reports = []
+        current_batch_start = start_page
+        batch_end = min(start_page + batch_size - 1, end_page)
+
+        # Process each page in the specified range
+        for current_page in range(start_page, end_page + 1):
+            try:
+                # Check if scraping should be stopped
+                if (
+                    hasattr(st.session_state, "stop_scraping")
+                    and st.session_state.stop_scraping
+                ):
+                    # Save the current batch before stopping
+                    if auto_save_batches and batch_reports:
+                        save_batch(
+                            batch_reports, 
+                            batch_number, 
+                            keyword, 
+                            category, 
+                            current_batch_start, 
+                            current_page - 1
+                        )
+                    st.warning("Scraping stopped by user")
+                    break
+
+                # Update progress
+                progress = (current_page - start_page) / (end_page - start_page + 1)
+                progress_bar.progress(progress)
+                status_text.text(
+                    f"Processing page {current_page} of {end_page} (out of {total_pages} total pages)"
+                )
+
+                # Construct current page URL
+                page_url = construct_search_url(
+                    base_url=base_url,
+                    keyword=keyword,
+                    category=category,
+                    category_slug=category_slug,
+                    page=current_page,
+                )
+
+                # Scrape current page
+                page_reports = scrape_page(page_url)
+
+                if page_reports:
+                    # Deduplicate based on title and URL
+                    existing_reports = {(r["Title"], r["URL"]) for r in all_reports}
+                    existing_batch_reports = {(r["Title"], r["URL"]) for r in batch_reports}
+                    
+                    new_reports = [
+                        r
+                        for r in page_reports
+                        if (r["Title"], r["URL"]) not in existing_reports 
+                        and (r["Title"], r["URL"]) not in existing_batch_reports
+                    ]
+
+                    # Add to both all_reports and batch_reports
+                    all_reports.extend(new_reports)
+                    batch_reports.extend(new_reports)
+                    
+                    report_count_text.text(
+                        f"Retrieved {len(all_reports)} unique reports so far..."
+                    )
+
+                # Check if we've reached the end of a batch
+                if auto_save_batches and (current_page == batch_end or current_page == end_page):
+                    if batch_reports:
+                        # Automatically save the batch
+                        saved_file = save_batch(
+                            batch_reports, 
+                            batch_number, 
+                            keyword, 
+                            category, 
+                            current_batch_start, 
+                            current_page
+                        )
+                        batch_status.success(
+                            f"Saved batch #{batch_number} (pages {current_batch_start}-{current_page}) to {saved_file}"
+                        )
+                        
+                        # Reset for next batch
+                        batch_reports = []
+                        batch_number += 1
+                        current_batch_start = current_page + 1
+                        batch_end = min(current_batch_start + batch_size - 1, end_page)
+                
+                # Add delay between pages
+                time.sleep(2)
+
+            except Exception as e:
+                logging.error(f"Error processing page {current_page}: {e}")
+                st.warning(
+                    f"Error on page {current_page}. Continuing with next page..."
+                )
+                continue
+
+        # Sort results if specified
+        if order != "relevance":
+            all_reports = sort_reports(all_reports, order)
+
+        # Clear progress indicators
+        progress_bar.empty()
+        status_text.empty()
+        report_count_text.empty()
+
+        if all_reports:
+            st.success(f"Successfully scraped {len(all_reports)} unique reports")
+            
+            # Final report
+            if auto_save_batches:
+                st.info(f"Reports were automatically saved in {batch_number} batches")
+        else:
+            st.warning("No reports were successfully retrieved")
+
+        return all_reports
+
+    except Exception as e:
+        logging.error(f"Error in scrape_pfd_reports: {e}")
+        st.error(f"An error occurred while scraping reports: {e}")
+        # Save any unsaved reports if an error occurs
+        if auto_save_batches and batch_reports:
+            save_batch(
+                batch_reports, 
+                batch_number, 
+                keyword, 
+                category, 
+                current_batch_start, 
+                "error"
+            )
+        return []
+
+
+def save_batch(
+    reports: List[Dict], 
+    batch_number: int, 
+    keyword: Optional[str], 
+    category: Optional[str], 
+    start_page: int, 
+    end_page: Union[int, str]
+) -> str:
+    """
+    Save a batch of reports to Excel file with appropriate naming
+    
+    Args:
+        reports: List of report dictionaries to save
+        batch_number: Current batch number
+        keyword: Search keyword used (for filename)
+        category: Category used (for filename)
+        start_page: Starting page of this batch
+        end_page: Ending page of this batch (or "error" if saving due to error)
+        
+    Returns:
+        Filename of the saved file
+    """
+    if not reports:
+        return ""
+    
+    # Process the data
+    df = pd.DataFrame(reports)
+    df = process_scraped_data(df)
+    
+    # Create timestamp for filename
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    
+    # Create descriptive filename parts
+    keyword_part = f"kw_{keyword.replace(' ', '_')}" if keyword else "no_keyword"
+    category_part = f"cat_{category.replace(' ', '_')}" if category else "no_category"
+    page_part = f"pages_{start_page}_to_{end_page}"
+    
+    # Generate filename
+    filename = f"pfd_reports_scraped_batch{batch_number}_{keyword_part}_{category_part}_{page_part}_{timestamp}.xlsx"
+    
+    # Ensure filename is valid (remove any problematic characters)
+    filename = re.sub(r'[\\/*?:"<>|]', "", filename)
+    
+    # Create directory if it doesn't exist
+    os.makedirs("scraped_reports", exist_ok=True)
+    file_path = os.path.join("scraped_reports", filename)
+    
+    # Save to Excel
+    df.to_excel(file_path, index=False, engine="openpyxl")
+    
+    logging.info(f"Saved batch {batch_number} to {file_path}")
+    return filename
+
+
+def render_scraping_tab():
+    """Render the scraping tab with batch saving options"""
+    st.subheader("Scrape PFD Reports")
+
+    # Initialize default values if not in session state
+    if "init_done" not in st.session_state:
+        st.session_state.init_done = True
+        st.session_state["search_keyword_default"] = "report"
+        st.session_state["category_default"] = ""
+        st.session_state["order_default"] = "relevance"
+        st.session_state["start_page_default"] = 1
+        st.session_state["end_page_default"] = None
+        st.session_state["auto_save_batches_default"] = True
+        st.session_state["batch_size_default"] = 5
+
+    if "scraped_data" in st.session_state and st.session_state.scraped_data is not None:
+        st.success(f"Found {len(st.session_state.scraped_data)} reports")
+
+        st.subheader("Results")
+        st.dataframe(
+            st.session_state.scraped_data,
+            column_config={
+                "URL": st.column_config.LinkColumn("Report Link"),
+                "date_of_report": st.column_config.DateColumn(
+                    "Date of Report", format="DD/MM/YYYY"
+                ),
+                "categories": st.column_config.ListColumn("Categories"),
+            },
+            hide_index=True,
+        )
+
+        show_export_options(st.session_state.scraped_data, "scraped")
+
+    # Create the search form with page range selection and batch options
+    with st.form("scraping_form"):
+        # Create two rows with two columns each
+        row1_col1, row1_col2 = st.columns(2)
+        row2_col1, row2_col2 = st.columns(2)
+        row3_col1, row3_col2 = st.columns(2)
+        row4_col1, row4_col2 = st.columns(2)
+
+        # First row
+        with row1_col1:
+            search_keyword = st.text_input(
+                "Search keywords:",
+                value=st.session_state.get("search_keyword_default", "report"),
+                key="search_keyword",
+                help="Do not leave empty, use 'report' or another search term",
+            )
+
+        with row1_col2:
+            category = st.selectbox(
+                "PFD Report type:",
+                [""] + get_pfd_categories(),
+                index=0,
+                key="category",
+                format_func=lambda x: x if x else "Select a category",
+            )
+
+        # Second row
+        with row2_col1:
+            order = st.selectbox(
+                "Sort by:",
+                ["relevance", "desc", "asc"],
+                index=0,
+                key="order",
+                format_func=lambda x: {
+                    "relevance": "Relevance",
+                    "desc": "Newest first",
+                    "asc": "Oldest first",
+                }[x],
+            )
+
+        with row2_col2:
+            # Get total pages for the query (preview)
+            if search_keyword or category:
+                base_url = "https://www.judiciary.uk/"
+
+                # Prepare category slug
+                category_slug = None
+                if category:
+                    category_slug = (
+                        category.lower()
+                        .replace(" ", "-")
+                        .replace("&", "and")
+                        .replace("--", "-")
+                        .strip("-")
+                    )
+
+                # Create preview URL
+                preview_url = construct_search_url(
+                    base_url=base_url,
+                    keyword=search_keyword,
+                    category=category,
+                    category_slug=category_slug,
+                )
+
+                try:
+                    with st.spinner("Checking total pages..."):
+                        total_pages, total_results = get_total_pages(preview_url)
+                        if total_pages > 0:
+                            st.info(
+                                f"This search has {total_pages} pages with {total_results} results"
+                            )
+                            st.session_state["total_pages_preview"] = total_pages
+                        else:
+                            st.warning("No results found for this search")
+                            st.session_state["total_pages_preview"] = 0
+                except Exception as e:
+                    st.error(f"Error checking pages: {str(e)}")
+                    st.session_state["total_pages_preview"] = 0
+            else:
+                st.session_state["total_pages_preview"] = 0
+
+        # Third row for page range
+        with row3_col1:
+            start_page = st.number_input(
+                "Start page:",
+                min_value=1,
+                value=st.session_state.get("start_page_default", 1),
+                key="start_page",
+                help="First page to scrape (minimum 1)",
+            )
+
+        with row3_col2:
+            end_page = st.number_input(
+                "End page:",
+                min_value=0,
+                value=st.session_state.get("end_page_default", 0),
+                key="end_page",
+                help="Last page to scrape (0 for all pages)",
+            )
+
+        # Fourth row for batch options
+        with row4_col1:
+            auto_save_batches = st.checkbox(
+                "Auto-save batches",
+                value=st.session_state.get("auto_save_batches_default", True),
+                key="auto_save_batches",
+                help="Automatically save results in batches as they are scraped",
+            )
+
+        with row4_col2:
+            batch_size = st.number_input(
+                "Pages per batch:",
+                min_value=1,
+                max_value=10,
+                value=st.session_state.get("batch_size_default", 5),
+                key="batch_size",
+                help="Number of pages to process before saving a batch",
+            )
+
+        # Action buttons in a row
+        button_col1, button_col2 = st.columns(2)
+        with button_col1:
+            submitted = st.form_submit_button("Search Reports")
+        with button_col2:
+            stop_scraping = st.form_submit_button("Stop Scraping")
+
+    # Handle stop scraping
+    if stop_scraping:
+        st.session_state.stop_scraping = True
+        st.warning("Scraping will be stopped after the current page completes...")
+        return
+
+    if submitted:
+        try:
+            # Store search parameters in session state
+            st.session_state.last_search_params = {
+                "keyword": search_keyword,
+                "category": category,
+                "order": order,
+                "start_page": start_page,
+                "end_page": end_page,
+                "auto_save_batches": auto_save_batches,
+                "batch_size": batch_size,
+            }
+
+            # Initialize stop_scraping flag
+            st.session_state.stop_scraping = False
+
+            # Convert end_page=0 to None (all pages)
+            end_page_val = None if end_page == 0 else end_page
+
+            # Perform scraping with batch options
+            reports = scrape_pfd_reports(
+                keyword=search_keyword,
+                category=category if category else None,
+                order=order,
+                start_page=start_page,
+                end_page=end_page_val,
+                auto_save_batches=auto_save_batches,
+                batch_size=batch_size,
+            )
+
+            if reports:
+                # Process the data
+                df = pd.DataFrame(reports)
+                df = process_scraped_data(df)
+
+                # Store in session state
+                st.session_state.scraped_data = df
+                st.session_state.data_source = "scraped"
+                st.session_state.current_data = df
+
+                # Trigger a rerun to refresh the page
+                st.rerun()
+            else:
+                st.warning("No reports found matching your search criteria")
+
+        except Exception as e:
+            st.error(f"An error occurred: {e}")
+            logging.error(f"Scraping error: {e}")
+            return False
+            
+
+def scrape_pfd_reports2(
     keyword: Optional[str] = None,
     category: Optional[str] = None,
     order: str = "relevance",
@@ -4446,7 +4936,7 @@ def construct_search_url(
 
 
 
-def render_scraping_tab():
+def render_scraping_tab2():
     """Render the scraping tab with a clean 2x2 filter layout and page range selection"""
     st.subheader("Scrape PFD Reports")
 
@@ -5845,7 +6335,9 @@ def show_export_options(df: pd.DataFrame, prefix: str):
                 )
             except Exception as e:
                 st.error(f"Error preparing Excel export: {str(e)}")
-
+        ##
+        # PDF Export section
+        # PDF Export section
         # PDF Export section
         if any(col.startswith("PDF_") and col.endswith("_Path") for col in df.columns):
             st.subheader("Download PDFs")
@@ -5857,14 +6349,60 @@ def show_export_options(df: pd.DataFrame, prefix: str):
                     pdf_columns = [col for col in df.columns if col.startswith("PDF_") and col.endswith("_Path")]
                     added_files = set()
                     pdf_count = 0
-
-                    for col in pdf_columns:
-                        paths = df[col].dropna()
-                        for pdf_path in paths:
-                            if pdf_path and os.path.exists(pdf_path) and pdf_path not in added_files:
-                                zipf.write(pdf_path, os.path.basename(pdf_path))
-                                added_files.add(pdf_path)
-                                pdf_count += 1
+                    folders_created = set()
+                    
+                    # Process each PDF file
+                    for idx, row in df.iterrows():
+                        # Build folder name using ref and deceased_name
+                        folder_parts = []
+                        
+                        # Add reference number if available
+                        if "ref" in row and pd.notna(row["ref"]):
+                            folder_parts.append(str(row["ref"]))
+                        
+                        # Add deceased name if available
+                        if "deceased_name" in row and pd.notna(row["deceased_name"]):
+                            # Clean up deceased name for folder name
+                            deceased_name = str(row["deceased_name"])
+                            # Remove invalid characters for folder names
+                            clean_name = re.sub(r'[<>:"/\\|?*]', '_', deceased_name)
+                            # Limit folder name length
+                            clean_name = clean_name[:50].strip()
+                            folder_parts.append(clean_name)
+                        
+                        # Create folder name from parts
+                        if folder_parts:
+                            folder_name = "_".join(folder_parts)
+                        else:
+                            # Fallback if no ref or deceased name
+                            record_id = str(row.get("Record ID", idx))
+                            folder_name = f"report_{record_id}"
+                        
+                        # Add year to folder if available
+                        if "year" in row and pd.notna(row["year"]):
+                            folder_name = f"{folder_name}_{row['year']}"
+                        
+                        # Keep track of created folders
+                        folders_created.add(folder_name)
+                        
+                        # Process each PDF for this row
+                        for col in pdf_columns:
+                            pdf_path = row.get(col)
+                            if pd.isna(pdf_path) or not pdf_path or not os.path.exists(pdf_path) or pdf_path in added_files:
+                                continue
+                            
+                            # Get the original filename without any modifications
+                            original_filename = os.path.basename(pdf_path)
+                            
+                            # Create archive path with folder structure
+                            zip_path = f"{folder_name}/{original_filename}"
+                            
+                            # Read the file content and write it to the ZIP
+                            with open(pdf_path, 'rb') as file:
+                                zipf.writestr(zip_path, file.read())
+                            
+                            added_files.add(pdf_path)
+                            pdf_count += 1
                 
                 # Reset buffer position
                 zip_buffer.seek(0)
@@ -5872,7 +6410,7 @@ def show_export_options(df: pd.DataFrame, prefix: str):
                 # PDF Download Button with Unique Key
                 pdf_key = f"download_pdfs_{prefix}_{unique_id}"
                 st.download_button(
-                    f"📦 Download All PDFs ({pdf_count} files)",
+                    f"📦 Download All PDFs ({pdf_count} files in {len(folders_created)} case folders)",
                     zip_buffer,
                     f"{filename}_pdfs.zip",
                     "application/zip",
@@ -5882,7 +6420,9 @@ def show_export_options(df: pd.DataFrame, prefix: str):
             except Exception as e:
                 st.error(f"Error preparing PDF download: {str(e)}")
                 logging.error(f"PDF download error: {e}", exc_info=True)
-
+        
+        ##
+       
     except Exception as e:
         st.error(f"Error setting up export options: {str(e)}")
         logging.error(f"Export options error: {e}", exc_info=True)
@@ -7380,9 +7920,9 @@ def render_summary_tab(cluster_results: Dict, original_data: pd.DataFrame) -> No
         st.markdown("---")
 
 
-# Modify the render_bert_analysis_tab function to remove duplicate description
+
 def render_bert_analysis_tab(data: pd.DataFrame = None):
-    """Modified render_bert_analysis_tab function without password protection"""
+    """Modified render_bert_analysis_tab function to include enhanced metadata in results"""
     
     # Ensure the bert_results dictionary exists in session state
     if "bert_results" not in st.session_state:
@@ -7417,6 +7957,7 @@ def render_bert_analysis_tab(data: pd.DataFrame = None):
             data = uploaded_data
 
             st.success("File uploaded and processed successfully!")
+                
         except Exception as e:
             st.error(f"Error uploading file: {str(e)}")
             return
@@ -7490,7 +8031,7 @@ def render_bert_analysis_tab(data: pd.DataFrame = None):
 
     # Run analysis if button is clicked
     if run_analysis:
-        with st.spinner("Performing BERT Theme Analysis..."):
+        with st.spinner("Performing Theme Analysis..."):
             try:
                 # Validate data selection
                 if selected_data is None or len(selected_data) == 0:
@@ -7498,7 +8039,7 @@ def render_bert_analysis_tab(data: pd.DataFrame = None):
                     return
 
                 # Initialize the theme analyzer (with loading message in a spinner)
-                with st.spinner("Loading BERT model and tokenizer..."):
+                with st.spinner("Loading annotation model and tokenizer..."):
                     # Initialize the analyzer
                     theme_analyzer = ThemeAnalyzer(
                         model_name="emilyalsentzer/Bio_ClinicalBERT"
@@ -7512,7 +8053,7 @@ def render_bert_analysis_tab(data: pd.DataFrame = None):
                     "base_similarity_threshold"
                 ] = similarity_threshold
 
-                # Perform analysis with highlighting
+                # Use the enhanced create_detailed_results method
                 (
                     results_df,
                     highlighted_texts,
@@ -7527,8 +8068,8 @@ def render_bert_analysis_tab(data: pd.DataFrame = None):
                 st.success("Analysis complete!")
 
             except Exception as e:
-                st.error(f"Error during BERT analysis: {str(e)}")
-                logging.error(f"BERT analysis error: {e}", exc_info=True)
+                st.error(f"Error during annotation analysis: {str(e)}")
+                logging.error(f"Annotation analysis error: {e}", exc_info=True)
 
     # Display results if they exist
     if "bert_results" in st.session_state and st.session_state.bert_results.get("results_df") is not None:
@@ -7539,21 +8080,22 @@ def render_bert_analysis_tab(data: pd.DataFrame = None):
         st.write(f"Total Theme Identifications: {len(results_df)}")
         
         # Clean up the results DataFrame to display only the essential columns
-        display_cols = ["Record ID", "Title", "Framework", "Theme", "Confidence", "Combined Score", "Matched Keywords", "Matched Sentences"]
-        display_df = results_df.copy()
+        display_cols = ["Record ID", "Title", "Framework", "Theme", "Confidence", "Combined Score", "Matched Keywords"]
         
-        # Only include columns that exist in the results
-        valid_cols = [col for col in display_cols if col in display_df.columns]
+        # Add metadata columns if available
+        for col in ["coroner_name", "coroner_area", "year", "date_of_report"]:
+            if col in results_df.columns:
+                display_cols.append(col)
         
-        # Reorder columns to put sentences at the end (they're usually longer)
-        if "Matched Sentences" in valid_cols:
-            valid_cols.remove("Matched Sentences")
-            valid_cols.append("Matched Sentences")
+        # Add matched sentences at the end
+        if "Matched Sentences" in results_df.columns:
+            display_cols.append("Matched Sentences")
         
-        # Create the display DataFrame
-        clean_df = display_df[valid_cols]
+        # Create the display DataFrame with only existing columns
+        valid_cols = [col for col in display_cols if col in results_df.columns]
+        clean_df = results_df[valid_cols].copy()
         
-        # Display the results table - full width and with a clear formatting
+        # Display the results table
         st.dataframe(
             clean_df,
             use_container_width=True,
@@ -7564,7 +8106,11 @@ def render_bert_analysis_tab(data: pd.DataFrame = None):
                 "Confidence": st.column_config.TextColumn("Confidence"),
                 "Combined Score": st.column_config.NumberColumn("Score", format="%.3f"),
                 "Matched Keywords": st.column_config.TextColumn("Keywords"),
-                "Matched Sentences": st.column_config.TextColumn("Matched Sentences")
+                "Matched Sentences": st.column_config.TextColumn("Matched Sentences"),
+                "coroner_name": st.column_config.TextColumn("Coroner Name"),
+                "coroner_area": st.column_config.TextColumn("Coroner Area"),
+                "year": st.column_config.NumberColumn("Year"),
+                "date_of_report": st.column_config.DateColumn("Date of Report", format="DD/MM/YYYY")
             }
         )
         
@@ -7578,12 +8124,12 @@ def render_bert_analysis_tab(data: pd.DataFrame = None):
         col1, col2 = st.columns(2)
         
         with col1:
-            # Excel download button
+            # Excel download button using the enhanced export_to_excel function
             excel_data = export_to_excel(clean_df)
             st.download_button(
                 "📥 Download Results Table",
                 data=excel_data,
-                file_name=f"bert_theme_analysis_{timestamp}.xlsx",
+                file_name=f"annotated_theme_analysis_{timestamp}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 key="bert_excel_download",
             )
@@ -7616,317 +8162,10 @@ def render_bert_analysis_tab(data: pd.DataFrame = None):
                 )
             else:
                 st.warning("HTML report not available")
-
+        
 def render_analysis_tab(data: pd.DataFrame = None):
     """Render the analysis tab with improved filters, file upload functionality, and analysis sections"""
-    st.header("Reports Analysis")
-    
-    # Add file upload section at the top
-    uploaded_file = st.file_uploader(
-        "Upload CSV or Excel file", 
-        type=['csv', 'xlsx'],
-        help="Upload previously exported data"
-    )
-    
-    if uploaded_file is not None:
-        try:
-            if uploaded_file.name.endswith('.csv'):
-                data = pd.read_csv(uploaded_file)
-            else:
-                data = pd.read_excel(uploaded_file)
-            
-            # Process uploaded data
-            data = process_scraped_data(data)
-            st.success("File uploaded and processed successfully!")
-            
-            # Update session state
-            st.session_state.uploaded_data = data.copy()
-            st.session_state.data_source = 'uploaded'
-            st.session_state.current_data = data.copy()
-        
-        except Exception as e:
-            st.error(f"Error uploading file: {str(e)}")
-            logging.error(f"File upload error: {e}", exc_info=True)
-            return
-    
-    # Use either uploaded data or passed data
-    if data is None:
-        data = st.session_state.get('current_data')
-    
-    # Show a permanent message if no data is available
-    # Note: We don't return early here anymore, so the description remains visible
-    if data is None or len(data) == 0:
-        st.warning("No data available. Please upload a file or scrape reports first.")
-        # Return here ONLY if no data at all
-        if data is None:
-            return
-        
-    try:
-        # Continue only if we have data
-        if data is not None and len(data) > 0:
-            # Get date range for the data
-            min_date = data['date_of_report'].min().date()
-            max_date = data['date_of_report'].max().date()
-            
-            # Filters sidebar
-            with st.sidebar:
-                st.header("Filters")
-                
-                # Date Range
-                with st.expander("📅 Date Range", expanded=True):
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        start_date = st.date_input(
-                            "From",
-                            value=min_date,
-                            min_value=min_date,
-                            max_value=max_date,
-                            key="start_date_filter",
-                            format="DD/MM/YYYY"
-                        )
-                    with col2:
-                        end_date = st.date_input(
-                            "To",
-                            value=max_date,
-                            min_value=min_date,
-                            max_value=max_date,
-                            key="end_date_filter",
-                            format="DD/MM/YYYY"
-                        )
-                
-                # Document Type Filter
-                doc_type = st.multiselect(
-                    "Document Type",
-                    ["Report", "Response"],
-                    default=[],
-                    key="doc_type_filter",
-                    help="Filter by document type"
-                )
-                
-                # Reference Number
-                ref_numbers = sorted(data['ref'].dropna().unique())
-                selected_refs = st.multiselect(
-                    "Reference Numbers",
-                    options=ref_numbers,
-                    key="ref_filter"
-                )
-                
-                # Deceased Name
-                deceased_search = st.text_input(
-                    "Deceased Name",
-                    key="deceased_filter",
-                    help="Enter partial or full name"
-                )
-                
-                # Coroner Name
-                coroner_names = sorted(data['coroner_name'].dropna().unique())
-                selected_coroners = st.multiselect(
-                    "Coroner Names",
-                    options=coroner_names,
-                    key="coroner_filter"
-                )
-                
-                # Coroner Area
-                coroner_areas = sorted(data['coroner_area'].dropna().unique())
-                selected_areas = st.multiselect(
-                    "Coroner Areas",
-                    options=coroner_areas,
-                    key="areas_filter"
-                )
-                
-                # Categories
-                all_categories = set()
-                for cats in data['categories'].dropna():
-                    if isinstance(cats, list):
-                        all_categories.update(cats)
-                selected_categories = st.multiselect(
-                    "Categories",
-                    options=sorted(all_categories),
-                    key="categories_filter"
-                )
-                
-                # Reset Filters Button
-                if st.button("🔄 Reset Filters"):
-                    for key in st.session_state:
-                        if key.endswith('_filter'):
-                            del st.session_state[key]
-                    st.rerun()
 
-            # Apply filters
-            filtered_df = data.copy()
-
-            # Date filter
-            if start_date and end_date:
-                filtered_df = filtered_df[
-                    (filtered_df['date_of_report'].dt.date >= start_date) &
-                    (filtered_df['date_of_report'].dt.date <= end_date)
-                ]
-
-            # Document type filter
-            if doc_type:
-                filtered_df = filtered_df[filtered_df.apply(is_response, axis=1)]
-
-            # Reference number filter
-            if selected_refs:
-                filtered_df = filtered_df[filtered_df['ref'].isin(selected_refs)]
-
-            if deceased_search:
-                filtered_df = filtered_df[
-                    filtered_df['deceased_name'].fillna('').str.contains(
-                        deceased_search, 
-                        case=False, 
-                        na=False
-                    )
-                ]
-
-            if selected_coroners:
-                filtered_df = filtered_df[filtered_df['coroner_name'].isin(selected_coroners)]
-
-            if selected_areas:
-                filtered_df = filtered_df[filtered_df['coroner_area'].isin(selected_areas)]
-
-            if selected_categories:
-                filtered_df = filtered_df[
-                    filtered_df['categories'].apply(
-                        lambda x: bool(x) and any(cat in x for cat in selected_categories)
-                    )
-                ]
-
-            # Show active filters
-            active_filters = []
-            if start_date != min_date or end_date != max_date:
-                active_filters.append(f"Date: {start_date.strftime('%d/%m/%Y')} to {end_date.strftime('%d/%m/%Y')}")
-            if doc_type and doc_type != ["Report", "Response"]:
-                active_filters.append(f"Document Types: {', '.join(doc_type)}")
-            if selected_refs:
-                active_filters.append(f"References: {', '.join(selected_refs)}")
-            if deceased_search:
-                active_filters.append(f"Deceased name contains: {deceased_search}")
-            if selected_coroners:
-                active_filters.append(f"Coroners: {', '.join(selected_coroners)}")
-            if selected_areas:
-                active_filters.append(f"Areas: {', '.join(selected_areas)}")
-            if selected_categories:
-                active_filters.append(f"Categories: {', '.join(selected_categories)}")
-
-            if active_filters:
-                st.info("Active filters:\n" + "\n".join(f"• {filter_}" for filter_ in active_filters))
-
-            # Display results
-            st.subheader("Results")
-            st.write(f"Showing {len(filtered_df)} of {len(data)} reports")
-
-            if len(filtered_df) > 0:
-                # Display the dataframe
-                st.dataframe(
-                    filtered_df,
-                    column_config={
-                        "URL": st.column_config.LinkColumn("Report Link"),
-                        "date_of_report": st.column_config.DateColumn(
-                            "Date of Report",
-                            format="DD/MM/YYYY"
-                        ),
-                        "categories": st.column_config.ListColumn("Categories"),
-                        "Document Type": st.column_config.TextColumn(
-                            "Document Type",
-                            help="Type of document based on PDF filename"
-                        )
-                    },
-                    hide_index=True
-                )
-
-                # Create tabs for different analyses
-                st.markdown("---")
-                quality_tab, temporal_tab, distribution_tab = st.tabs([
-                    "📊 Data Quality Analysis",
-                    "📅 Temporal Analysis",
-                    "📍 Distribution Analysis"
-                ])
-
-                # Data Quality Analysis Tab
-                with quality_tab:
-                    analyze_data_quality(filtered_df)
-
-                # Temporal Analysis Tab
-                with temporal_tab:
-                    # Timeline of reports
-                    st.subheader("Reports Timeline")
-                    plot_timeline(filtered_df)
-                    
-                    # Monthly distribution
-                    st.subheader("Monthly Distribution")
-                    plot_monthly_distribution(filtered_df)
-                    
-                    # Year-over-year comparison
-                    st.subheader("Year-over-Year Comparison")
-                    plot_yearly_comparison(filtered_df)
-                    
-                    # Seasonal patterns
-                    st.subheader("Seasonal Patterns")
-                    seasonal_counts = filtered_df['date_of_report'].dt.month.value_counts().sort_index()
-                    month_names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
-                                 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-                    fig = px.line(
-                        x=month_names,
-                        y=[seasonal_counts.get(i, 0) for i in range(1, 13)],
-                        markers=True,
-                        labels={'x': 'Month', 'y': 'Number of Reports'},
-                        title='Seasonal Distribution of Reports'
-                    )
-                    st.plotly_chart(fig, use_container_width=True)
-
-                # Distribution Analysis Tab
-                with distribution_tab:
-                        st.subheader("Reports by Category")
-                        plot_category_distribution(filtered_df)
-                        st.subheader("Reports by Coroner Area")
-                        plot_coroner_areas(filtered_df)
-
-                # Export options
-                st.markdown("---")
-                st.subheader("Export Options")
-                col1, col2 = st.columns(2)
-                
-                # CSV Export
-                with col1:
-                    csv = filtered_df.to_csv(index=False).encode('utf-8')
-                    st.download_button(
-                        "📥 Download Results (CSV)",
-                        csv,
-                        "filtered_reports.csv",
-                        "text/csv"
-                    )
-                
-                # Excel Export
-                with col2:
-                    excel_data = export_to_excel(filtered_df)
-                    st.download_button(
-                        "📥 Download Results (Excel)",
-                        excel_data,
-                        "filtered_reports.xlsx",
-                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                    )
-            else:
-                st.warning("No data matches the selected filters.")
-
-    except Exception as e:
-        st.error(f"An error occurred: {str(e)}")
-        logging.error(f"Analysis error: {e}", exc_info=True)
-        
-def render_analysis_tab2(data: pd.DataFrame = None):
-    """Render the analysis tab with improved filters, file upload functionality, and analysis sections"""
-    st.header("Reports Analysis")
-    st.markdown(
-        """
-        Analyse and explore your prepared Prevention of Future Deaths (PFD) reports.
-        - Upload processed files from Scraped File Preparation (this file starts with the name merged_)
-        - Data visualisation
-        - Report insights and export options
-
-        Upload your prepared CSV or Excel file (starts with name merged_timestamp) from Step 2 to begin analysis.
-        """
-    )
-    
     # Add file upload section at the top
     uploaded_file = st.file_uploader(
         "Upload CSV or Excel file", 
@@ -8262,6 +8501,1364 @@ def render_bert_file_merger():
 
 
 
+def render_theme_analysis_dashboard(data: pd.DataFrame = None):
+    """
+    Render a comprehensive dashboard for analyzing themes by various metadata fields
+    
+    Args:
+        data: Optional DataFrame containing theme analysis results
+    """
+    #st.title("Theme Analysis Dashboard")
+    
+    # Check for existing data in session state
+    if data is None:
+        if "dashboard_data" in st.session_state:
+            data = st.session_state.dashboard_data
+    
+    # File upload section with persistent state
+    upload_key = "theme_analysis_dashboard_uploader"
+    uploaded_file = st.file_uploader(
+        "Upload CSV or Excel file for Dashboard Analysis",
+        type=["csv", "xlsx"],
+        key=upload_key
+    )
+    
+    # Process uploaded file
+    if uploaded_file is not None:
+        try:
+            # Load the file based on its type
+            if uploaded_file.name.endswith('.csv'):
+                data = pd.read_csv(uploaded_file)
+            else:
+                data = pd.read_excel(uploaded_file)
+            
+            # Process the data to ensure it's clean
+            data = process_scraped_data(data)
+            
+            # Store in session state
+            st.session_state.dashboard_data = data
+            
+            st.success(f"File uploaded successfully! Found {len(data)} records.")
+        except Exception as e:
+            st.error(f"Error processing file: {e}")
+            return
+    
+    # If no data is available after upload
+    if data is None or len(data) == 0:
+        st.markdown("""
+        ### To get theme analysis data:
+        
+        1. **Upload Existing Results**
+           - Use the file uploader above to load previously saved theme analysis results
+        
+        2. **Run New Theme Analysis**
+           - Go to the 'Concept Annotation' tab 
+           - Upload your merged PFD reports file
+           - Run a new theme analysis
+        """)
+        
+        return  # Exit the function if no data
+    
+    # Validate required columns
+    required_cols = ["Framework", "Theme"]
+    recommended_cols = ["coroner_area", "coroner_name", "year"]
+    
+    missing_required = [col for col in required_cols if col not in data.columns]
+    missing_recommended = [col for col in recommended_cols if col not in data.columns]
+    
+    if missing_required:
+        st.error(f"Missing required columns: {', '.join(missing_required)}")
+        return
+    
+    if missing_recommended:
+        st.warning(f"Some recommended columns are missing: {', '.join(missing_recommended)}")
+    
+    # Data Overview
+    st.subheader("Data Overview")
+    metrics_col1, metrics_col2, metrics_col3, metrics_col4 = st.columns(4)
+    
+    with metrics_col1:
+        st.metric("Total Theme Identifications", len(data))
+    with metrics_col2:
+        st.metric("Unique Themes", data["Theme"].nunique())
+    
+    with metrics_col3:
+        if "coroner_area" in data.columns and not data["coroner_area"].isna().all():
+            st.metric("Coroner Areas", data["coroner_area"].nunique())
+        else:
+            st.metric("Coroner Areas", "N/A")
+    
+    with metrics_col4:
+        if "year" in data.columns and not data["year"].isna().all():
+            years_count = data["year"].dropna().nunique()
+            year_text = f"{years_count}" if years_count > 0 else "N/A"
+            st.metric("Years Covered", year_text)
+        else:
+            st.metric("Years Covered", "N/A")
+            
+    results_df = data.copy() if data is not None else pd.DataFrame()
+    
+    #
+    
+    # Sidebar filters
+    # Find the sidebar filter section in the render_theme_analysis_dashboard function 
+    # and replace it with this improved version:
+    
+    # Sidebar filters
+    st.sidebar.header("Dashboard Filters")
+    
+    # Framework filter
+    frameworks = ["All"] + sorted(results_df["Framework"].unique().tolist())
+    selected_framework = st.sidebar.selectbox("Filter by Framework", frameworks)
+    
+    # Year filter - Modified to handle single year selection properly
+    years = sorted(results_df["year"].dropna().unique().tolist())
+    if years:
+        min_year, max_year = min(years), max(years)
+        
+        # If only one year available, provide a checkbox instead of slider
+        if min_year == max_year:
+            include_year = st.sidebar.checkbox(f"Include year {min_year}", value=True)
+            if include_year:
+                selected_years = (min_year, max_year)
+            else:
+                selected_years = None
+        else:
+            # For multiple years, keep using the slider
+            selected_years = st.sidebar.slider(
+                "Year Range", min_year, max_year, (min_year, max_year)
+            )
+    else:
+        selected_years = None
+    
+    # Coroner area filter - MODIFIED: Multi-select instead of single select
+    areas = sorted(results_df["coroner_area"].dropna().unique().tolist())
+    area_options = ["All Areas"] + areas
+    # Default to "All Areas" if no specific selection
+    area_filter_type = st.sidebar.radio("Coroner Area Filter Type", ["All Areas", "Select Specific Areas"])
+    if area_filter_type == "All Areas":
+        selected_areas = areas  # Include all areas
+    else:
+        # Multi-select for specific areas
+        selected_areas = st.sidebar.multiselect(
+            "Select Areas", 
+            options=areas,
+            default=None,
+            help="Select one or more specific coroner areas to include"
+        )
+        # If nothing selected, default to all areas
+        if not selected_areas:
+            st.sidebar.warning("No areas selected. Showing all areas.")
+            selected_areas = areas
+    
+    # Coroner name filter - MODIFIED: Multi-select instead of single select
+    names = sorted(results_df["coroner_name"].dropna().unique().tolist())
+    name_filter_type = st.sidebar.radio("Coroner Name Filter Type", ["All Coroners", "Select Specific Coroners"])
+    if name_filter_type == "All Coroners":
+        selected_names = names  # Include all coroner names
+    else:
+        # Multi-select for specific coroner names
+        selected_names = st.sidebar.multiselect(
+            "Select Coroners", 
+            options=names,
+            default=None,
+            help="Select one or more specific coroners to include"
+        )
+        # If nothing selected, default to all names
+        if not selected_names:
+            st.sidebar.warning("No coroners selected. Showing all coroners.")
+            selected_names = names
+    
+    # Number of top themes to display
+    top_n_themes = st.sidebar.slider("Number of Top Themes", 5, 20, 10)
+    
+    # Confidence filter - MODIFIED: Multi-select instead of minimum
+    confidence_levels = ["High", "Medium", "Low"]
+    confidence_filter_type = st.sidebar.radio("Confidence Filter Type", ["All Confidence Levels", "Select Specific Levels"])
+    if confidence_filter_type == "All Confidence Levels":
+        selected_confidence_levels = confidence_levels  # Include all confidence levels
+    else:
+        # Multi-select for specific confidence levels
+        selected_confidence_levels = st.sidebar.multiselect(
+            "Select Confidence Levels", 
+            options=confidence_levels,
+            default=["High", "Medium"],  # Default to high and medium
+            help="Select one or more confidence levels to include"
+        )
+        # If nothing selected, default to all confidence levels
+        if not selected_confidence_levels:
+            st.sidebar.warning("No confidence levels selected. Showing all levels.")
+            selected_confidence_levels = confidence_levels
+    
+    # Apply filters - UPDATED to handle new multi-select filters
+    filtered_df = results_df.copy()
+    
+    if selected_framework != "All":
+        filtered_df = filtered_df[filtered_df["Framework"] == selected_framework]
+    
+    if selected_years:
+        # Handle edge case of single year (where both values are the same)
+        if selected_years[0] == selected_years[1]:
+            filtered_df = filtered_df[filtered_df["year"] == selected_years[0]]
+        else:
+            filtered_df = filtered_df[(filtered_df["year"] >= selected_years[0]) & 
+                                    (filtered_df["year"] <= selected_years[1])]
+    
+    # Apply multi-select area filter
+    filtered_df = filtered_df[filtered_df["coroner_area"].isin(selected_areas)]
+    
+    # Apply multi-select coroner name filter
+    filtered_df = filtered_df[filtered_df["coroner_name"].isin(selected_names)]
+    
+    # Apply multi-select confidence level filter
+    filtered_df = filtered_df[filtered_df["Confidence"].isin(selected_confidence_levels)]
+    
+    # Display filter summary
+    active_filters = []
+    if selected_framework != "All":
+        active_filters.append(f"Framework: {selected_framework}")
+    if selected_years:
+        if selected_years[0] == selected_years[1]:
+            active_filters.append(f"Year: {selected_years[0]}")
+        else:
+            active_filters.append(f"Years: {selected_years[0]}-{selected_years[1]}")
+    if area_filter_type == "Select Specific Areas" and selected_areas:
+        if len(selected_areas) <= 3:
+            active_filters.append(f"Areas: {', '.join(selected_areas)}")
+        else:
+            active_filters.append(f"Areas: {len(selected_areas)} selected")
+    if name_filter_type == "Select Specific Coroners" and selected_names:
+        if len(selected_names) <= 3:
+            active_filters.append(f"Coroners: {', '.join(selected_names)}")
+        else:
+            active_filters.append(f"Coroners: {len(selected_names)} selected")
+    if confidence_filter_type == "Select Specific Levels" and selected_confidence_levels:
+        active_filters.append(f"Confidence: {', '.join(selected_confidence_levels)}")
+    
+    if active_filters:
+        st.info("Active filters: " + " | ".join(active_filters))
+    
+    if len(filtered_df) == 0:
+        st.warning("No data matches the selected filters. Please adjust your filters.")
+        return
+        
+    # Continue with the rest of the dashboard code...
+    # Create tabs for different visualizations
+    tab1, tab2, tab3, tab4, tab5 = st.tabs([
+        "Framework Heatmap", 
+        "Theme Distribution", 
+        "Temporal Analysis", 
+        "Area Comparison",
+        "Correlation Analysis"
+    ])
+    
+    # === TAB 1: FRAMEWORK HEATMAP ===
+    # === TAB 1: FRAMEWORK HEATMAP ===
+    with tab1:
+        st.subheader("Framework Theme Heatmap by Year")
+        
+        if "year" not in filtered_df.columns or filtered_df["year"].isna().all():
+            st.warning("No year data available for temporal analysis.")
+        else:
+            # Handle special case where we only have one year
+            if filtered_df["year"].nunique() == 1:
+                st.info(f"Showing data for year {filtered_df['year'].iloc[0]}")
+                
+                # Create a simplified categorical count visualization for single year
+                theme_counts = filtered_df.groupby(['Framework', 'Theme']).size().reset_index(name='Count')
+                
+                # Sort by framework and count
+                theme_counts = theme_counts.sort_values(['Framework', 'Count'], ascending=[True, False])
+                
+                # Display as a horizontal bar chart grouped by framework
+                fig = px.bar(
+                    theme_counts,
+                    y='Theme',
+                    x='Count',
+                    color='Framework',
+                    title=f"Theme Distribution for Year {filtered_df['year'].iloc[0]}",
+                    height=max(500, len(theme_counts) * 30),
+                    color_discrete_map={
+                        "I-SIRch": "orange",
+                        "House of Commons": "royalblue",
+                        "Extended Analysis": "firebrick"
+                    }
+                )
+                
+                fig.update_layout(
+                    xaxis_title="Number of Reports",
+                    yaxis_title="Theme",
+                    yaxis={'categoryorder': 'total ascending'},
+                    font=dict(family="Arial, sans-serif", color="white"),
+                    paper_bgcolor="rgba(0,0,0,0)",
+                    plot_bgcolor="rgba(0,0,0,0)",
+                    margin=dict(l=200, r=40, t=80, b=60)
+                )
+                
+                # Update axes for dark mode
+                fig.update_xaxes(
+                    title_font=dict(color="white"),
+                    tickfont=dict(color="white"),
+                    gridcolor="rgba(255,255,255,0.1)"
+                )
+                
+                fig.update_yaxes(
+                    title_font=dict(color="white"),
+                    tickfont=dict(color="white")
+                )
+                
+                st.plotly_chart(fig, use_container_width=True)
+            else:
+                # Regular heatmap code for multiple years
+                # Create combined framework:theme field
+                filtered_df['Framework_Theme'] = filtered_df['Framework'] + ': ' + filtered_df['Theme']
+                
+                # Count reports per year (for denominator)
+                # Assuming Record ID is the unique identifier for reports
+                id_column = 'Record ID' if 'Record ID' in filtered_df.columns else filtered_df.columns[0]
+                reports_per_year = filtered_df.groupby('year')[id_column].nunique()
+                
+                # Count unique report IDs per theme per year
+                counts = filtered_df.groupby(['year', 'Framework', 'Framework_Theme'])[id_column].nunique().reset_index()
+                counts.columns = ['year', 'Framework', 'Framework_Theme', 'Count']
+                
+                # Calculate percentages
+                counts['Total'] = counts['year'].map(reports_per_year)
+                counts['Percentage'] = (counts['Count'] / counts['Total'] * 100).round(1)
+                
+                # Get frameworks in the filtered data
+                frameworks_present = filtered_df['Framework'].unique()
+                
+                # Get top themes by framework (5 per framework)
+                top_themes = []
+                for framework in frameworks_present:
+                    framework_counts = counts[counts['Framework'] == framework]
+                    theme_totals = framework_counts.groupby('Framework_Theme')['Count'].sum().sort_values(ascending=False)
+                    top_themes.extend(theme_totals.head(5).index.tolist())
+                
+                # Filter to top themes
+                counts = counts[counts['Framework_Theme'].isin(top_themes)]
+                
+                # Create pivot table for heatmap
+                pivot = counts.pivot_table(
+                    index='Framework_Theme',
+                    columns='year',
+                    values='Percentage',
+                    fill_value=0
+                )
+                
+                # Create pivot for counts
+                count_pivot = counts.pivot_table(
+                    index='Framework_Theme',
+                    columns='year',
+                    values='Count',
+                    fill_value=0
+                )
+                
+                # Sort by framework then by total count
+                theme_totals = counts.groupby('Framework_Theme')['Count'].sum()
+                theme_frameworks = {theme: theme.split(':')[0] for theme in theme_totals.index}
+                
+                # Sort first by framework, then by count within framework
+                sorted_themes = sorted(
+                    theme_totals.index,
+                    key=lambda x: (theme_frameworks[x], -theme_totals[x])
+                )
+                
+                # Apply the sort order
+                pivot = pivot.reindex(sorted_themes)
+                count_pivot = count_pivot.reindex(sorted_themes)
+                
+                # Create color mapping for frameworks
+                framework_colors = {
+                    "I-SIRch": "orange",
+                    "House of Commons": "royalblue",
+                    "Extended Analysis": "firebrick"
+                }
+                
+                # Default colors for any frameworks not specifically mapped
+                other_colors = ["forestgreen", "purple", "darkred"]
+                for i, framework in enumerate(frameworks_present):
+                    if framework not in framework_colors:
+                        framework_colors[framework] = other_colors[i % len(other_colors)]
+                
+                # Create a visually distinctive dataframe for plotting
+                # For each theme, create a dict with clean name and framework
+                theme_display_data = []
+                
+                for theme in pivot.index:
+                    framework = theme.split(':')[0].strip()
+                    theme_name = theme.split(':', 1)[1].strip()
+                    
+                    # Insert line breaks for long theme names
+                    if len(theme_name) > 30:
+                        # Try to break at a space near the middle
+                        words = theme_name.split()
+                        if len(words) > 1:
+                            # Find a breaking point near the middle
+                            mid_point = len(words) // 2
+                            first_part = ' '.join(words[:mid_point])
+                            second_part = ' '.join(words[mid_point:])
+                            theme_name = f"{first_part}<br>{second_part}"
+                    
+                    theme_display_data.append({
+                        'original': theme,
+                        'clean_name': theme_name,
+                        'framework': framework,
+                        'color': framework_colors[framework]
+                    })
+                    
+                theme_display_df = pd.DataFrame(theme_display_data)
+                
+                # Add year count labels
+                year_labels = [f"{year}<br>n={reports_per_year[year]}" for year in pivot.columns]
+                
+                # Create heatmap using plotly
+                fig = go.Figure()
+                
+                # Add heatmap
+                heatmap = go.Heatmap(
+                    z=pivot.values,
+                    x=year_labels,
+                    y=theme_display_df['clean_name'],
+                    colorscale=[
+                        [0, '#f7fbff'],      # Lightest blue (almost white) for zero values
+                        [0.2, '#deebf7'],    # Very light blue
+                        [0.4, '#9ecae1'],    # Light blue
+                        [0.6, '#4292c6'],    # Medium blue
+                        [0.8, '#2171b5'],    # Deep blue
+                        [1.0, '#084594']     # Darkest blue
+                    ],
+                    zmin=0,
+                    zmax=min(100, pivot.values.max() * 1.2),  # Cap at 100% or 20% higher than max
+                    colorbar=dict(
+                        title=dict(text="Percentage (%)", font=dict(color="white", size=12)),
+                        tickfont=dict(color="white", size=10),
+                        outlinecolor="rgba(255,255,255,0.3)",
+                        outlinewidth=1
+                    ),
+                    hoverongaps=False,
+                    text=count_pivot.values,  # This will show the count in the hover
+                    hovertemplate='Year: %{x}<br>Theme: %{y}<br>Percentage: %{z}%<br>Count: %{text}<extra></extra>'
+                )
+                
+                fig.add_trace(heatmap)
+                
+                # Add count annotations
+                for i in range(len(pivot.index)):
+                    for j in range(len(pivot.columns)):
+                        if pivot.iloc[i, j] > 0:
+                            count = count_pivot.iloc[i, j]
+                            
+                            # Calculate appropriate text color based on cell value
+                            bg_intensity = pivot.iloc[i, j] / 100  # Normalize to 0-1
+                            text_color = 'white' if bg_intensity > 0.4 else 'black'
+                            
+                            # Add an annotation with outline for better visibility
+                            fig.add_annotation(
+                                x=j,
+                                y=i,
+                                text=f"({count})",
+                                font=dict(size=9, color=text_color),
+                                showarrow=False,
+                                xanchor="center",
+                                yanchor="middle",
+                                bordercolor="rgba(0,0,0,0.2)",
+                                borderwidth=1,
+                                borderpad=2
+                            )
+                
+                # Improved framework indicator styling
+                for framework, color in framework_colors.items():
+                    # Find rows corresponding to this framework
+                    framework_rows = theme_display_df[theme_display_df['framework'] == framework]
+                    
+                    if len(framework_rows) > 0:
+                        # Get the indices in the sorted display order
+                        indices = framework_rows.index.tolist()
+                        min_idx = min(indices)
+                        max_idx = max(indices)
+                        
+                        # Add a colored rectangle with higher contrast
+                        fig.add_shape(
+                            type="rect",
+                            x0=-1.3,  # Further to the left
+                            x1=-0.7,  # Wider rectangle
+                            y0=min_idx - 0.5,  # Align with the heatmap cells
+                            y1=max_idx + 0.5,
+                            fillcolor=color,
+                            opacity=0.85,  # More visible
+                            layer="below",
+                            line=dict(width=1, color='rgba(255,255,255,0.5)')  # White border
+                        )
+                        
+                        # Add framework label with black or white text based on background color
+                        if len(framework_rows) > 1:  # Only add text if multiple themes in framework
+                            # Determine text color (black for light backgrounds, white for dark)
+                            text_color = "black" if framework in ["I-SIRch"] else "white"
+                            
+                            fig.add_annotation(
+                                x=-1.0,
+                                y=(min_idx + max_idx) / 2,
+                                text=framework,
+                                showarrow=False,
+                                textangle=90,  # Vertical text
+                                font=dict(size=12, color=text_color, family="Arial, sans-serif"),
+                                xanchor="center",
+                                yanchor="middle"
+                            )
+                
+                # Update layout for better readability on dark background
+                fig.update_layout(
+                    title="Framework Theme Heatmap by Year",
+                    font=dict(family="Arial, sans-serif", color="white"),  # White font for dark background
+                    title_font=dict(size=8, color="white"),  # Larger title with white color
+                    xaxis_title="Year (number of reports)",
+                    yaxis_title="Theme",
+                    height=max(650, len(pivot.index) * 35),  # Increased height
+                    width=900,  # Set explicit width
+                    margin=dict(l=220, r=60, t=80, b=80),  # Increased margins
+                    paper_bgcolor="rgba(0,0,0,0)",  # Transparent background
+                    plot_bgcolor="rgba(0,0,0,0)",  # Transparent background
+                    legend=dict(
+                        orientation="h",
+                        yanchor="bottom",
+                        y=1.05,  # Moved up for more space
+                        xanchor="center",
+                        x=0.5,
+                        bgcolor="rgba(50,50,50,0.8)",  # Dark semi-transparent background
+                        bordercolor="rgba(255,255,255,0.3)",
+                        borderwidth=1,
+                        font=dict(color="white")  # White text for legend
+                    )
+                )
+                
+                # Set y-axis formatting for dark mode
+                fig.update_layout(
+                    yaxis=dict(
+                        tickmode='array',
+                        tickvals=list(range(len(theme_display_df))),
+                        ticktext=theme_display_df['clean_name'],
+                        tickfont=dict(
+                            size=11,
+                            color='white'  # White text for y-axis labels
+                        ),
+                        gridcolor="rgba(255,255,255,0.1)",  # Very subtle grid
+                    )
+                )
+                
+                # Improve x-axis formatting for dark mode
+                fig.update_xaxes(
+                    tickangle=-0,  # Horizontal labels
+                    title_font=dict(size=14, color="white"),  # White color for axis title
+                    tickfont=dict(size=12, color="white"),  # White color for tick labels
+                    gridcolor="rgba(255,255,255,0.1)"  # Very subtle grid
+                )
+                
+                # Improve y-axis formatting for dark mode
+                fig.update_yaxes(
+                    title_font=dict(size=14, color="white"),  # White color for axis title
+                    tickfont=dict(size=11, color="white"),  # White color for tick labels
+                    automargin=True  # Ensure labels fit properly
+                )
+                
+                # Add framework legend
+                for i, (framework, color) in enumerate(framework_colors.items()):
+                    if framework in frameworks_present:  # Only show legends for frameworks present in data
+                        fig.add_trace(go.Scatter(
+                            x=[None],
+                            y=[None],
+                            mode='markers',
+                            marker=dict(size=10, color=color),
+                            name=framework,
+                            showlegend=True
+                        ))
+                
+                # Use st.plotly_chart's config parameter for better sizing
+                st.plotly_chart(
+                    fig, 
+                    use_container_width=True,
+                    config={
+                        'displayModeBar': True,
+                        'responsive': True,
+                        'toImageButtonOptions': {
+                            'format': 'png',
+                            'filename': 'theme_heatmap',
+                            'height': 800,
+                            'width': 1200,
+                            'scale': 2  # Higher resolution
+                        }
+                    }
+                )
+    # === TAB 2: THEME DISTRIBUTION ===
+    with tab2:
+        st.subheader("Theme Distribution Analysis")
+        
+        # Get top themes by count
+        theme_counts = filtered_df["Theme"].value_counts().head(top_n_themes)
+        
+        # Create a bar chart
+        fig = px.bar(
+            x=theme_counts.index,
+            y=theme_counts.values,
+            labels={"x": "Theme", "y": "Count"},
+            title=f"Top {top_n_themes} Themes by Occurrence",
+            height=500,
+        )
+        
+        # Improve layout
+        fig.update_layout(
+            xaxis_title="Theme",
+            yaxis_title="Number of Occurrences",
+            xaxis={'categoryorder':'total descending'},
+            xaxis_tickangle=-45,
+        )
+        
+        st.plotly_chart(fig, use_container_width=True)
+        
+        # Theme by confidence
+        st.subheader("Theme Confidence Breakdown")
+        
+        # Group by theme and confidence
+        theme_confidence = filtered_df.groupby(["Theme", "Confidence"]).size().reset_index(name="Count")
+        
+        # Filter for top themes only
+        top_themes = theme_counts.index.tolist()
+        theme_confidence = theme_confidence[theme_confidence["Theme"].isin(top_themes)]
+        
+        # Create a grouped bar chart
+        fig = px.bar(
+            theme_confidence, 
+            x="Theme", 
+            y="Count", 
+            color="Confidence",
+            barmode="group",
+            color_discrete_map={"High": "#4CAF50", "Medium": "#FFC107", "Low": "#F44336"},
+            category_orders={"Theme": top_themes, "Confidence": ["High", "Medium", "Low"]},
+            title="Confidence Distribution by Theme"
+        )
+        
+        fig.update_layout(xaxis_tickangle=-45)
+        st.plotly_chart(fig, use_container_width=True)
+    
+    # === TAB 3: TEMPORAL ANALYSIS ===
+    # === TAB 3: TEMPORAL ANALYSIS ===
+    with tab3:
+        st.subheader("Temporal Analysis")
+        
+        if "year" not in filtered_df.columns or filtered_df["year"].isna().all():
+            st.warning("No year data available for temporal analysis.")
+        else:
+            # Create a time series of themes by year
+            year_theme_counts = filtered_df.groupby(["year", "Theme"]).size().reset_index(name="Count")
+            
+            # Filter for top themes only - get top themes by total count
+            all_theme_counts = filtered_df["Theme"].value_counts()
+            top_themes = all_theme_counts.head(top_n_themes).index.tolist()
+            
+            year_theme_counts = year_theme_counts[year_theme_counts["Theme"].isin(top_themes)]
+            
+            # Create a line chart - important fix: convert year to string to treat as categorical
+            year_theme_counts['year_str'] = year_theme_counts['year'].astype(str)
+            
+            fig = px.line(
+                year_theme_counts,
+                x="year_str",  # Use string version of year
+                y="Count",
+                color="Theme",
+                markers=True,
+                #title="Theme Trends Over Time",
+                height=500,
+            )
+            
+            # Improve layout
+            fig.update_layout(
+                xaxis_title="Year",
+                yaxis_title="Number of Occurrences",
+                xaxis=dict(
+                    type='category',  # Force categorical x-axis
+                    tickmode="array",
+                    tickvals=sorted(year_theme_counts['year_str'].unique()),
+                    ticktext=sorted(year_theme_counts['year_str'].unique()),
+                ),
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+                font=dict(color="white"),
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+            )
+            
+            # Update axes for dark mode
+            fig.update_xaxes(
+                title_font=dict(color="white"),
+                tickfont=dict(color="white"),
+                gridcolor="rgba(255,255,255,0.1)"
+            )
+            
+            fig.update_yaxes(
+                title_font=dict(color="white"),
+                tickfont=dict(color="white"),
+                gridcolor="rgba(255,255,255,0.1)"
+            )
+            
+            st.plotly_chart(fig, use_container_width=True)
+            
+            # Heatmap of themes by year
+            st.subheader("Theme Prevalence by Year")
+            
+            # Create a pivot table
+            pivot_df = year_theme_counts.pivot(index="Theme", columns="year_str", values="Count").fillna(0)
+            
+            # Convert to a normalized heatmap (percentage)
+            # Calculate the total themes per year (instead of total reports)
+            year_theme_totals = pivot_df.sum(axis=0)
+            normalized_pivot = pivot_df.div(year_theme_totals, axis=1) * 100
+            
+            # Create a heatmap - ensure years are in correct order
+            year_order = sorted(year_theme_counts['year'].unique())
+            year_order_str = [str(y) for y in year_order]
+            
+            fig = px.imshow(
+                normalized_pivot[year_order_str],  # Ensure columns are in correct order
+                labels=dict(x="Year", y="Theme", color="% of Themes"),
+                x=year_order_str,  # Use sorted string years
+                y=normalized_pivot.index,
+                color_continuous_scale=[
+                    [0, '#f7fbff'],      # Lightest blue (almost white) for zero values
+                    [0.2, '#deebf7'],    # Very light blue
+                    [0.4, '#9ecae1'],    # Light blue
+                    [0.6, '#4292c6'],    # Medium blue
+                    [0.8, '#2171b5'],    # Deep blue
+                    [1.0, '#084594']     # Darkest blue
+                ],
+                title="Theme Prevalence by Year (%)",
+                height=600,
+                aspect="auto",
+                text_auto=".1f"  # Show percentage to 1 decimal place
+            )
+            
+            fig.update_layout(
+                xaxis=dict(
+                    type='category',  # Force categorical x-axis
+                    tickmode="array",
+                    tickvals=year_order_str,
+                    ticktext=year_order_str,
+                ),
+                font=dict(color="white"),
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+            )
+            
+            # Update axes and colorbar for dark mode
+            fig.update_xaxes(
+                title_font=dict(color="white"),
+                tickfont=dict(color="white")
+            )
+            
+            fig.update_yaxes(
+                title_font=dict(color="white"),
+                tickfont=dict(color="white")
+            )
+            
+            fig.update_traces(
+                colorbar=dict(
+                    title=dict(text="% of Themes", font=dict(color="white")),
+                    tickfont=dict(color="white")
+                )
+            )
+            
+            st.plotly_chart(fig, use_container_width=True)
+    
+    # === TAB 4: AREA COMPARISON ===
+    with tab4:
+        st.subheader("Coroner Area Comparison")
+        
+        if "coroner_area" not in filtered_df.columns or filtered_df["coroner_area"].isna().all():
+            st.warning("No coroner area data available for area comparison.")
+        else:
+            # Get the top areas by theme count
+            area_counts = filtered_df["coroner_area"].value_counts().head(10)
+            top_areas = area_counts.index.tolist()
+            
+            # Create a bar chart of top areas
+            fig = px.bar(
+                x=area_counts.index,
+                y=area_counts.values,
+                labels={"x": "Coroner Area", "y": "Count"},
+                title="Theme Identifications by Coroner Area",
+                height=500,
+            )
+            
+            fig.update_layout(xaxis_tickangle=-45)
+            st.plotly_chart(fig, use_container_width=True)
+            
+            # Multi-area theme comparison
+            st.subheader("Theme Distribution Across Top Coroner Areas")
+            
+            # Calculate total records per area (for normalization)
+            area_totals = {}
+            for area in top_areas:
+                area_totals[area] = len(filtered_df[filtered_df["coroner_area"] == area])
+            
+            # Get theme distribution for each area
+            area_theme_data = []
+            
+            for area in top_areas:
+                area_df = filtered_df[filtered_df["coroner_area"] == area]
+                area_themes = area_df["Theme"].value_counts()
+                
+                # Calculate percentage for each top theme
+                for theme in top_themes:
+                    count = area_themes.get(theme, 0)
+                    percentage = (count / area_totals[area] * 100) if area_totals[area] > 0 else 0
+                    
+                    area_theme_data.append({
+                        "Coroner Area": area,
+                        "Theme": theme,
+                        "Count": count,
+                        "Percentage": round(percentage, 1)
+                    })
+            
+            area_theme_df = pd.DataFrame(area_theme_data)
+            
+            # Create heatmap
+            pivot_df = area_theme_df.pivot(index="Coroner Area", columns="Theme", values="Percentage").fillna(0)
+            
+            # Limit to top areas and themes
+            pivot_df = pivot_df.loc[top_areas, top_themes]
+            
+            fig = px.imshow(
+                pivot_df,
+                labels=dict(x="Theme", y="Coroner Area", color="Percentage"),
+                x=pivot_df.columns,
+                y=pivot_df.index,
+                color_continuous_scale="YlGnBu",
+                title="Theme Distribution by Coroner Area (%)",
+                height=600,
+                aspect="auto",
+                text_auto=".1f"
+            )
+            
+            fig.update_layout(
+                xaxis_title="Theme",
+                yaxis_title="Coroner Area",
+                xaxis_tickangle=-45,
+                coloraxis_colorbar=dict(title="% of Cases")
+            )
+            
+            st.plotly_chart(fig, use_container_width=True)
+            
+            # Radar chart option for areas
+            st.subheader("Theme Radar Comparison")
+            
+            # Select areas for radar chart
+            radar_areas = st.multiselect(
+                "Select Areas to Compare (2-5 recommended)",
+                options=top_areas,
+                default=top_areas[:3] if len(top_areas) >= 3 else top_areas
+            )
+            
+            if radar_areas and len(radar_areas) >= 2:
+                # Filter data for selected areas and top themes
+                radar_data = area_theme_df[
+                    (area_theme_df["Coroner Area"].isin(radar_areas)) & 
+                    (area_theme_df["Theme"].isin(top_themes[:8]))  # Limit to 8 themes for readability
+                ]
+                
+                # Create radar chart
+                fig = go.Figure()
+                
+                # Add traces for each area
+                for area in radar_areas:
+                    area_data = radar_data[radar_data["Coroner Area"] == area]
+                    # Sort by theme to ensure consistency
+                    area_data = area_data.set_index("Theme").reindex(top_themes[:8]).reset_index()
+                    
+                    fig.add_trace(go.Scatterpolar(
+                        r=area_data["Percentage"],
+                        theta=area_data["Theme"],
+                        fill="toself",
+                        name=area
+                    ))
+                
+                fig.update_layout(
+                    polar=dict(
+                        radialaxis=dict(
+                            visible=True,
+                            range=[0, max(radar_data["Percentage"]) * 1.1]
+                        )
+                    ),
+                    showlegend=True,
+                    title="Theme Distribution Radar Chart",
+                    height=600
+                )
+                
+                st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.info("Please select at least 2 areas for radar comparison.")
+    
+    # === TAB 5: CORRELATION ANALYSIS ===
+    with tab5:
+        st.subheader("Theme Correlation Analysis")
+        
+        # Create correlation explanation
+        st.markdown("""
+        This analysis reveals relationships between themes. A high correlation suggests that when one theme appears, 
+        the other is likely to appear in the same documents as well.
+        """)
+        
+        # Calculate correlation between themes
+        # First, pivot the data to get a binary matrix of themes by report
+        id_column = 'Record ID' if 'Record ID' in filtered_df.columns else filtered_df.columns[0]
+        
+        # Create a binary pivot table: 1 if theme exists for a report, 0 otherwise
+        theme_pivot = pd.crosstab(
+            index=filtered_df[id_column], 
+            columns=filtered_df['Theme'],
+            values=filtered_df['Combined Score'],  # Use the score if we want weighted values
+            aggfunc='max'  # Take the maximum score for each theme in a report
+        ).fillna(0)
+        
+        # Convert to binary (1 if theme exists, 0 otherwise)
+        theme_pivot = (theme_pivot > 0).astype(int)
+        
+        # Calculate correlation between themes
+        theme_corr = theme_pivot.corr()
+        
+        # Get only the top themes for clarity
+        top_theme_corr = theme_corr.loc[top_themes, top_themes]
+        
+        # Create a heatmap of correlations
+        fig = px.imshow(
+            top_theme_corr,
+            color_continuous_scale=px.colors.diverging.RdBu_r,  # Red-Blue diverging colorscale
+            color_continuous_midpoint=0,
+            labels=dict(x="Theme", y="Theme", color="Correlation"),
+            title="Theme Correlation Matrix",
+            height=700,
+            width=700,
+            text_auto=".2f"  # Show correlation values with 2 decimal places
+        )
+        
+        fig.update_layout(
+            xaxis_tickangle=-45,
+        )
+        
+        st.plotly_chart(fig)
+        
+        # Network graph of correlations
+        st.subheader("Theme Connection Network")
+        
+        # Correlation threshold slider
+        corr_threshold = st.slider(
+            "Correlation Threshold", 
+            min_value=0.0, 
+            max_value=1.0, 
+            value=0.3, 
+            step=0.05,
+            help="Minimum correlation value to show connections between themes"
+        )
+        
+        # Create network from correlation matrix
+        G = nx.Graph()
+        
+        # Add nodes (themes)
+        for theme in top_theme_corr.columns:
+            G.add_node(theme)
+        
+        # Add edges (correlations above threshold)
+        for i, theme1 in enumerate(top_theme_corr.columns):
+            for j, theme2 in enumerate(top_theme_corr.columns):
+                if i < j:  # Only process each pair once
+                    correlation = top_theme_corr.loc[theme1, theme2]
+                    if correlation >= corr_threshold:
+                        G.add_edge(theme1, theme2, weight=correlation)
+        
+        # Check if we have any edges
+        if len(G.edges()) == 0:
+            st.warning(f"No connections found with correlation threshold of {corr_threshold}. Try lowering the threshold.")
+        else:
+            # Calculate positions using the Fruchterman-Reingold force-directed algorithm
+            pos = nx.spring_layout(G, seed=42)  # For reproducibility
+            
+            # Get edge weights
+            edge_weights = [G[u][v]['weight'] * 5 for u, v in G.edges()]
+            
+            # Create a network visualization
+            edge_trace = []
+            
+            # Add edges with width proportional to correlation
+            for edge in G.edges():
+                x0, y0 = pos[edge[0]]
+                x1, y1 = pos[edge[1]]
+                weight = G[edge[0]][edge[1]]['weight']
+                
+                edge_trace.append(
+                    go.Scatter(
+                        x=[x0, x1, None],
+                        y=[y0, y1, None],
+                        line=dict(width=weight*5, color=f'rgba(100,100,100,{weight})'),
+                        hoverinfo='none',
+                        mode='lines'
+                    )
+                )
+            
+            # Add nodes
+            node_x = []
+            node_y = []
+            node_text = []
+            node_size = []
+            
+            for node in G.nodes():
+                x, y = pos[node]
+                node_x.append(x)
+                node_y.append(y)
+                # Calculate node size based on number of connections
+                size = len(list(G.neighbors(node))) * 10 + 20
+                node_size.append(size)
+                # Create node text for hover
+                neighbors = list(G.neighbors(node))
+                connections = [f"{neighbor} (r={G[node][neighbor]['weight']:.2f})" for neighbor in neighbors]
+                connection_text = "<br>".join(connections)
+                node_text.append(f"{node}<br>Connections: {len(connections)}<br>{connection_text}")
+            
+            node_trace = go.Scatter(
+                x=node_x, y=node_y,
+                mode='markers+text',
+                text=[t.split(':')[0] for t in G.nodes()],  # Show only first part of theme name
+                textposition="top center",
+                marker=dict(
+                    size=node_size,
+                    color='skyblue',
+                    line=dict(width=1, color='white')
+                ),
+                hoverinfo='text',
+                hovertext=node_text
+            )
+            
+            # Create the figure
+            fig = go.Figure(
+                data=edge_trace + [node_trace],
+                layout=go.Layout(
+                    title=f'Theme Connection Network (r ≥ {corr_threshold})',
+                    showlegend=False,
+                    hovermode='closest',
+                    margin=dict(b=20, l=5, r=5, t=40),
+                    xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+                    yaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+                    width=800,
+                    height=800
+                )
+            )
+            
+            st.plotly_chart(fig)
+
+            # Create a co-occurrence frequency table
+            st.subheader("Theme Co-occurrence Table")
+            
+            # Create a matrix to count co-occurrences
+            co_occurrence_matrix = np.zeros((len(top_themes), len(top_themes)))
+            
+            # Iterate through each document to count co-occurrences
+            for doc_id in theme_pivot.index:
+                # Get themes present in this document
+                doc_themes = theme_pivot.columns[theme_pivot.loc[doc_id] == 1].tolist()
+                # Only consider top themes
+                doc_themes = [t for t in doc_themes if t in top_themes]
+                
+        # Count pairs
+
+        # Count pairs of co-occurring themes
+            for i, theme1 in enumerate(doc_themes):
+                idx1 = top_themes.index(theme1)
+                for theme2 in doc_themes:
+                    idx2 = top_themes.index(theme2)
+                    co_occurrence_matrix[idx1, idx2] += 1
+        
+        # Create a DataFrame from the co-occurrence matrix
+        co_occurrence_df = pd.DataFrame(
+            co_occurrence_matrix,
+            index=top_themes,
+            columns=top_themes
+        )
+        
+        # Display the co-occurrence table
+        st.dataframe(
+            co_occurrence_df,
+            use_container_width=True,
+            height=400
+        )
+        
+        # Add explanation
+        st.markdown("""
+        This table shows the number of documents where each pair of themes co-occurs. 
+        The diagonal represents the total count of each theme.
+        """)
+
+        # Show detailed data table
+        with st.expander("View Detailed Data"):
+            st.dataframe(
+                filtered_df,
+                column_config={
+                    "Title": st.column_config.TextColumn("Document Title"),
+                    "Framework": st.column_config.TextColumn("Framework"),
+                    "Theme": st.column_config.TextColumn("Theme"),
+                    "Confidence": st.column_config.TextColumn("Confidence"),
+                    "Combined Score": st.column_config.NumberColumn("Score", format="%.3f"),
+                    "Matched Keywords": st.column_config.TextColumn("Keywords"),
+                    "coroner_name": st.column_config.TextColumn("Coroner Name"),
+                    "coroner_area": st.column_config.TextColumn("Coroner Area"),
+                    "year": st.column_config.NumberColumn("Year"),
+                },
+                use_container_width=True
+            )
+            
+        # Export options
+        st.subheader("Export Filtered Data")
+        
+        # Generate timestamp for filenames
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        
+        # Create columns for download buttons
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            # CSV Export
+            csv = filtered_df.to_csv(index=False).encode("utf-8")
+            st.download_button(
+                "📥 Download Filtered Data (CSV)",
+                data=csv,
+                file_name=f"theme_analysis_export_{timestamp}.csv",
+                mime="text/csv",
+                key=f"download_csv_{timestamp}",
+            )
+        
+        with col2:
+            # Excel Export
+            excel_data = export_to_excel(filtered_df)
+            st.download_button(
+                "📥 Download Filtered Data (Excel)",
+                data=excel_data,
+                file_name=f"theme_analysis_export_{timestamp}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                key=f"download_excel_{timestamp}",
+            )
+                    
+                
+def render_framework_heatmap(filtered_df, top_n_themes=5):
+    """
+    Create a framework-based heatmap of theme distribution by year with framework coloring
+    
+    Args:
+        filtered_df: Filtered DataFrame containing theme analysis results
+        top_n_themes: Number of top themes to show per framework
+        
+    Returns:
+        Plotly figure object
+    """
+    if "year" not in filtered_df.columns or filtered_df["year"].isna().all():
+        return None
+    
+    # Create combined framework:theme field
+    filtered_df['Framework_Theme'] = filtered_df['Framework'] + ': ' + filtered_df['Theme']
+    
+    # Count reports per year (for denominator)
+    # Assuming Record ID is the unique identifier for reports
+    id_column = 'Record ID' if 'Record ID' in filtered_df.columns else filtered_df.columns[0]
+    reports_per_year = filtered_df.groupby('year')[id_column].nunique()
+    
+    # Count unique report IDs per theme per year
+    counts = filtered_df.groupby(['year', 'Framework', 'Framework_Theme'])[id_column].nunique().reset_index()
+    counts.columns = ['year', 'Framework', 'Framework_Theme', 'Count']
+    
+    # Calculate percentages
+    counts['Total'] = counts['year'].map(reports_per_year)
+    counts['Percentage'] = (counts['Count'] / counts['Total'] * 100).round(1)
+    
+    # Get frameworks in the filtered data
+    frameworks_present = filtered_df['Framework'].unique()
+    
+    # Get top themes by framework (N per framework)
+    top_themes = []
+    for framework in frameworks_present:
+        framework_counts = counts[counts['Framework'] == framework]
+        theme_totals = framework_counts.groupby('Framework_Theme')['Count'].sum().sort_values(ascending=False)
+        top_themes.extend(theme_totals.head(top_n_themes).index.tolist())
+    
+    # Filter to top themes
+    counts = counts[counts['Framework_Theme'].isin(top_themes)]
+    
+    # Create pivot table for heatmap
+    pivot = counts.pivot_table(
+        index='Framework_Theme',
+        columns='year',
+        values='Percentage',
+        fill_value=0
+    )
+    
+    # Create pivot for counts
+    count_pivot = counts.pivot_table(
+        index='Framework_Theme',
+        columns='year',
+        values='Count',
+        fill_value=0
+    )
+    
+    # Sort by framework then by total count
+    theme_totals = counts.groupby('Framework_Theme')['Count'].sum()
+    theme_frameworks = {theme: theme.split(':')[0] for theme in theme_totals.index}
+    
+    # Sort first by framework, then by count within framework
+    sorted_themes = sorted(
+        theme_totals.index,
+        key=lambda x: (theme_frameworks[x], -theme_totals[x])
+    )
+    
+    # Apply the sort order
+    pivot = pivot.reindex(sorted_themes)
+    count_pivot = count_pivot.reindex(sorted_themes)
+    
+    # Create color mapping for frameworks
+    framework_colors = {}
+    for i, framework in enumerate(frameworks_present):
+        if framework == 'I-SIRch':
+            framework_colors[framework] = "orange"  # Orange for I-SIRch
+        elif framework == 'House of Commons':
+            framework_colors[framework] = "royalblue"  # Blue for House of Commons
+        else:
+            # Use other colors for other frameworks
+            other_colors = ["forestgreen", "purple", "darkred"]
+            framework_colors[framework] = other_colors[i % len(other_colors)]
+    
+    # Create a visually distinctive dataframe for plotting
+    # For each theme, create a dict with clean name and framework
+    theme_display_data = []
+    
+    for theme in pivot.index:
+        framework = theme.split(':')[0].strip()
+        theme_name = theme.split(':', 1)[1].strip()
+        
+        # Insert line breaks for long theme names
+        if len(theme_name) > 30:
+            # Try to break at a space near the middle
+            words = theme_name.split()
+            if len(words) > 1:
+                # Find a breaking point near the middle
+                mid_point = len(words) // 2
+                first_part = ' '.join(words[:mid_point])
+                second_part = ' '.join(words[mid_point:])
+                theme_name = f"{first_part}<br>{second_part}"
+        
+        theme_display_data.append({
+            'original': theme,
+            'clean_name': theme_name,
+            'framework': framework,
+            'color': framework_colors[framework]
+        })
+        
+    theme_display_df = pd.DataFrame(theme_display_data)
+    
+    # Add year count labels
+    year_labels = [f"{year}<br>n={reports_per_year[year]}" for year in pivot.columns]
+    
+    # Create heatmap using plotly
+    fig = go.Figure()
+    
+    # Add heatmap
+    heatmap = go.Heatmap(
+        z=pivot.values,
+        x=year_labels,
+        y=theme_display_df['clean_name'],
+        colorscale='Blues',
+        zmin=0,
+        zmax=min(100, pivot.values.max() * 1.2),  # Cap at 100% or 20% higher than max
+        colorbar=dict(title='Percentage (%)'),
+        hoverongaps=False,
+        text=count_pivot.values,  # This will show the count in the hover
+        hovertemplate='Year: %{x}<br>Theme: %{y}<br>Percentage: %{z}%<br>Count: %{text}<extra></extra>'
+    )
+    
+    fig.add_trace(heatmap)
+    
+    # Add count annotations
+    for i in range(len(pivot.index)):
+        for j in range(len(pivot.columns)):
+            if pivot.iloc[i, j] > 0:
+                count = count_pivot.iloc[i, j]
+                
+                # Add an annotation for the actual count
+                fig.add_annotation(
+                    x=j,
+                    y=i,
+                    text=f"({count})",
+                    font=dict(size=8, color='black' if pivot.iloc[i, j] < 50 else 'white'),
+                    showarrow=False,
+                    xanchor='center',
+                    yanchor='top',
+                    yshift=-12
+                )
+    
+    # Set y-axis ordering and color-coding
+    fig.update_layout(
+        yaxis=dict(
+            tickmode='array',
+            tickvals=list(range(len(theme_display_df))),
+            ticktext=theme_display_df['clean_name'],
+            tickfont=dict(
+                size=11,
+                color='black'
+            ),
+        )
+    )
+    
+    # Add colored framework indicators
+    for framework, color in framework_colors.items():
+        # Count themes for this framework
+        framework_theme_count = theme_display_df[theme_display_df['framework'] == framework].shape[0]
+        
+        if framework_theme_count > 0:
+            # Add a shape for the framework indicator
+            fig.add_shape(
+                type="rect",
+                x0=-1,  # Slightly to the left of the y-axis
+                x1=-0.5,
+                y0=len(theme_display_df) - theme_display_df[theme_display_df['framework'] == framework].index[0] - framework_theme_count,
+                y1=len(theme_display_df) - theme_display_df[theme_display_df['framework'] == framework].index[0],
+                fillcolor=color,
+                opacity=0.6,
+                layer="below",
+                line=dict(width=0)
+            )
+    
+    # Add framework legend
+    for i, (framework, color) in enumerate(framework_colors.items()):
+        fig.add_trace(go.Scatter(
+            x=[None],
+            y=[None],
+            mode='markers',
+            marker=dict(size=10, color=color),
+            name=framework,
+            showlegend=True
+        ))
+    
+    # Update layout
+    fig.update_layout(
+        title="Theme Distribution by Year",
+        xaxis_title="Year (number of reports)",
+        yaxis_title="Theme",
+        height=len(pivot.index) * 30 + 200,  # Adjust height based on number of themes
+        margin=dict(l=200, r=20, t=60, b=60),
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="center",
+            x=0.5
+        )
+    )
+    
+    return fig
+
+
 def main():
     """Updated main application entry point."""
     initialize_session_state()
@@ -8292,6 +9889,7 @@ def main():
             "(3)📊 Scraped File Analysis",
             "(4)📝 Topic Analysis & Summaries", 
             "(5)🔬 Concept Annotation",
+            "(6)📈 Theme Analysis Dashboard",
         ],
         label_visibility="collapsed",
         horizontal=True,
@@ -8310,7 +9908,7 @@ def main():
                 - Filtering by keywords, categories, and date ranges
                 - Export options in CSV and Excel formats
 
-                Handling Large Result Sets: For extensive search results, use the 'Start page' and 'End page' number inputs to download reports in manageable batches.
+                Handling Large Result Sets: For extensive search results, use the 'Start page' and 'End page' number inputs to download reports in manageable batches (ideally no more than 5 pages per batch). The outputs of every batch will be displayed in a single excel file. 
                 """
             )
             render_scraping_tab()
@@ -8376,7 +9974,26 @@ def main():
                 """
             )
             render_bert_analysis_tab(st.session_state.current_data)
+            
+        elif current_tab == "(6)📈 Theme Analysis Dashboard":
+            # Add tab-specific description here
+            st.markdown(
+                """
+                ## Interactive Theme Analysis Dashboard
+                Visualise and explore theme patterns across your Prevention of Future Deaths (PFD) reports.
+                
+                - Upload your theme analysis results from step (5) (file named annotated_theme_analysis_*.xlsx)
+                - Navigate through multiple visualization tabs: framework heatmaps, distribution charts, temporal analysis and more
+                - Filter results by framework, year, coroner area, and confidence level
+                - Discover relationships between themes using correlation analysis and network visualizations
+                - Export filtered data for further analysis
+                
+                Start by uploading your theme analysis file to generate comprehensive visualizations.
+                """
+            )
+            render_theme_analysis_dashboard(st.session_state.current_data)
 
+        # Sidebar data management
         # Sidebar data management
         with st.sidebar:
             st.header("Data Management")
@@ -8384,7 +10001,7 @@ def main():
             if hasattr(st.session_state, "data_source"):
                 st.info(f"Current data: {st.session_state.data_source}")
             
-            if st.button("Clear All Data"):
+            if st.button("Clear All Data", key="clear_all_data_button"):
                 # Define a comprehensive list of keys to clear
                 keys_to_clear = [
                     # Core data keys
@@ -8398,6 +10015,10 @@ def main():
                     "bert_results",
                     "bert_initialized",
                     "bert_merged_data",
+                    
+                    # Dashboard specific keys
+                    "dashboard_data",
+                    "theme_analysis_dashboard_uploader",
                     
                     # File upload keys
                     "bert_file_uploader",
@@ -8414,7 +10035,7 @@ def main():
                     "duplicate_columns_static",
                     "merge_files_button_static",
                     
-                    # Analysis filter keys
+                    # Filter keys used in the dashboard
                     "start_date_filter",
                     "end_date_filter",
                     "doc_type_filter",
@@ -8431,6 +10052,7 @@ def main():
                         del st.session_state[key]
                 
                 # Force re-initialization of key values
+                # These explicit resets ensure clean state
                 st.session_state.current_data = None
                 st.session_state.uploaded_data = None
                 st.session_state.scraped_data = None
@@ -8438,14 +10060,16 @@ def main():
                 st.session_state.bert_results = {}
                 st.session_state.bert_initialized = False
                 st.session_state.bert_merged_data = None
+                st.session_state.dashboard_data = None
                 
-                # Increment reset counter to force new file uploader keys
+                # Generate a unique key for file uploaders to force reload
                 if "reset_counter" not in st.session_state:
                     st.session_state.reset_counter = 0
                 st.session_state.reset_counter += 1
                 
                 # Give feedback and rerun
                 st.success("All data cleared successfully")
+                time.sleep(0.5)  # Brief pause to ensure UI updates
                 st.rerun()
 
             # Add logout button
@@ -8460,141 +10084,7 @@ def main():
         
         # Render footer even when an exception occurs
         render_footer()
-def main2():
-    """Updated main application entry point."""
-    initialize_session_state()
-    
-    # Check authentication first
-    if not check_app_password():
-        return
-    
-    # Only show the main app content if authenticated
-    st.title("UK Judiciary PFD Reports Analysis")
-    st.markdown(
-        """
-    This application analyses Prevention of Future Deaths (PFD) reports from the UK Judiciary website.
-    You can scrape new reports, analyse existing data, and explore thematic patterns.
-    """
-    )
 
-    # Updated tab selection with the new BERT File Merger tab
-    current_tab = st.radio(
-        "Select section:",
-        [
-            "(1)🔍 Scrape Reports",
-            "(2)📂 Scraped File Preparation",
-            "(3)📊 Scraped File Analysis",
-            "(4)📝 Topic Analysis & Summaries", 
-            "(5)🔬 Concept Annotation",
-        ],
-        label_visibility="collapsed",
-        horizontal=True,
-        key="main_tab_selector",
-    )
-    st.markdown("---")
-
-    try:
-        if current_tab == "(1)🔍 Scrape Reports":
-            render_scraping_tab()
-        
-        elif current_tab == "(2)📂 Scraped File Preparation":
-            render_bert_file_merger()
-        
-        elif current_tab == "(3)📊 Scraped File Analysis":
-            if not validate_data_state():
-                handle_no_data_state("analysis")
-            else:
-                render_analysis_tab(st.session_state.current_data)
-        
-        elif current_tab == "(4)📝 Topic Analysis & Summaries":
-            if not validate_data_state():
-                handle_no_data_state("topic_summary")
-            else:
-                render_topic_summary_tab(st.session_state.current_data)
-        
-        elif current_tab == "(5)🔬 Concept Annotation":
-            render_bert_analysis_tab(st.session_state.current_data)
-
-        # Sidebar data management
-        with st.sidebar:
-            st.header("Data Management")
-        
-            if hasattr(st.session_state, "data_source"):
-                st.info(f"Current data: {st.session_state.data_source}")
-            
-            if st.button("Clear All Data"):
-                # Define a comprehensive list of keys to clear
-                keys_to_clear = [
-                    # Core data keys
-                    "current_data",
-                    "scraped_data", 
-                    "uploaded_data",
-                    "topic_model",
-                    "data_source",
-                    
-                    # BERT-specific keys
-                    "bert_results",
-                    "bert_initialized",
-                    "bert_merged_data",
-                    
-                    # File upload keys
-                    "bert_file_uploader",
-                    "bert_content_column",
-                    "bert_analysis_type",
-                    "bert_selected_indices",
-                    "bert_similarity_threshold",
-                    
-                    # BERT merger settings keys
-                    "drop_duplicates_static",
-                    "extract_year_static",
-                    "extract_from_pdf_static",
-                    "fill_empty_content_static",
-                    "duplicate_columns_static",
-                    "merge_files_button_static",
-                    
-                    # Analysis filter keys
-                    "start_date_filter",
-                    "end_date_filter",
-                    "doc_type_filter",
-                    "ref_filter",
-                    "deceased_filter",
-                    "coroner_filter",
-                    "areas_filter",
-                    "categories_filter",
-                ]
-                
-                # Clear each key if it exists
-                for key in keys_to_clear:
-                    if key in st.session_state:
-                        del st.session_state[key]
-                
-                # Force re-initialization of key values
-                st.session_state.current_data = None
-                st.session_state.uploaded_data = None
-                st.session_state.scraped_data = None
-                st.session_state.data_source = None
-                st.session_state.bert_results = {}
-                st.session_state.bert_initialized = False
-                st.session_state.bert_merged_data = None
-                
-                # Increment reset counter to force new file uploader keys
-                if "reset_counter" not in st.session_state:
-                    st.session_state.reset_counter = 0
-                st.session_state.reset_counter += 1
-                
-                # Give feedback and rerun
-                st.success("All data cleared successfully")
-                st.rerun()
-
-            # Add logout button
-            if st.button("Logout"):
-                st.session_state.authenticated = False
-                st.rerun()
-
-        render_footer()
-
-    except Exception as e:
-        handle_error(e)
 
 if __name__ == "__main__":
     try:
