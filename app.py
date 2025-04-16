@@ -9875,8 +9875,20 @@ def main():
     # Add the main descriptive text here, before any tab selection
     st.markdown(
         """
-        This application analyses Prevention of Future Deaths (PFD) reports from the UK Judiciary website.
-        You can scrape new reports, analyse existing data, and explore thematic patterns.
+        ## UK Judiciary PFD Reports Analysis Tool
+        
+        This application analyses Prevention of Future Deaths (PFD) reports from the UK Judiciary website to uncover patterns, themes, and insights that can help prevent future deaths.
+        
+        ### How to use this tool:
+        
+        1. **(1) 🔍 Scrape Reports**: Start by collecting PFD reports from the UK Judiciary website
+        2. **(2) 📂 Scraped File Preparation**: Process and merge your scraped reports
+        3. **(3) 📊 Scraped File Analysis**: Visualise and analyze basic report patterns
+        4. **(4) 📝 Topic Analysis & Summaries**: Generate basic themes from report content
+        5. **(5) 🔬 Concept Annotation**: Conduct advanced theme analysis with AI
+        6. **(6) 📈 Theme Analysis Dashboard**: Explore comprehensive theme visualizations
+        
+        Select each numbered tab in sequence to move through the complete analysis pipeline.
         """
     )
 
