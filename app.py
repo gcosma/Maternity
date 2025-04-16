@@ -8545,18 +8545,19 @@ def render_theme_analysis_dashboard(data: pd.DataFrame = None):
     
     # If no data is available after upload
     if data is None or len(data) == 0:
-        st.markdown("""
-        ### To get theme analysis data:
-        
-        1. **Upload Existing Results**
-           - Use the file uploader above to load previously saved theme analysis results
-        
-        2. **Run New Theme Analysis**
-           - Go to the 'Concept Annotation' tab 
-           - Upload your merged PFD reports file
-           - Run a new theme analysis
-        """)
-        
+        with st.expander("💡 How to Use This Tool"):
+            st.markdown("""
+            ### To get theme analysis data:
+            
+            1. **Upload Existing Results**
+               - Use the file uploader above to load previously saved theme analysis results
+            
+            2. **Run New Theme Analysis**
+               - Go to the 'Concept Annotation' tab 
+               - Upload your merged PFD reports file
+               - Run a new theme analysis
+            """)
+            
         return  # Exit the function if no data
     
     # Validate required columns
