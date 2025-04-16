@@ -9858,7 +9858,6 @@ def render_framework_heatmap(filtered_df, top_n_themes=5):
     
     return fig
 
-
 def main():
     """Updated main application entry point."""
     initialize_session_state()
@@ -9872,57 +9871,66 @@ def main():
     # Only show the main app content if authenticated
     st.title("UK Judiciary PFD Reports Analysis")
     
-    # Add collapsible help section
-    with st.expander("💡 How to Use This Tool"):
-st.markdown(
-    """
-    ## UK Judiciary PFD Reports Analysis Tool
-    
-    This application analyzes Prevention of Future Deaths (PFD) reports from the UK Judiciary website to uncover patterns, themes, and insights that can help prevent future deaths.
-    """
-)
-
-# Add collapsible help section
-with st.expander("💡 How to Use This Tool"):
+    # Add main description
     st.markdown(
         """
-        ### Complete Analysis Pipeline:
-        
-        1. **(1) 🔍 Scrape Reports**: Start by collecting PFD reports from the UK Judiciary website
-        2. **(2) 📂 Scraped File Preparation**: Process and merge your scraped reports
-        3. **(3) 📊 Scraped File Analysis**: Visualize and analyze basic report patterns
-        4. **(4) 📝 Topic Analysis & Summaries**: Generate basic themes from report content
-        5. **(5) 🔬 Concept Annotation**: Conduct advanced theme analysis with AI
-        6. **(6) 📈 Theme Analysis Dashboard**: Explore comprehensive theme visualizations
-        
-        Select each numbered tab in sequence to move through the complete analysis pipeline.
-        
-        ### Tips:
-        - Each step generates outputs that can be used in subsequent steps
-        - You can upload previously generated files at any step
-        - Use the "Clear All Data" button in the sidebar to reset the application
+        This application analyzes Prevention of Future Deaths (PFD) reports from the UK Judiciary website to uncover patterns, themes, and insights.
         """
     )
+    
+    # Add collapsible help section
+    with st.expander("💡 How to Use This Tool"):
+        st.markdown(
+            """
+            ### Complete Analysis Pipeline:
+            
+            1. **(1) 🔍 Scrape Reports**: Start by collecting PFD reports from the UK Judiciary website
+            2. **(2) 📂 Scraped File Preparation**: Process and merge your scraped reports
+            3. **(3) 📊 Scraped File Analysis**: Visualize and analyze basic report patterns
+            4. **(4) 📝 Topic Analysis & Summaries**: Generate basic themes from report content
+            5. **(5) 🔬 Concept Annotation**: Conduct advanced theme analysis with AI
+            6. **(6) 📈 Theme Analysis Dashboard**: Explore comprehensive theme visualizations
+            
+            Select each numbered tab in sequence to move through the complete analysis pipeline.
+            
+            ### Tips:
+            - Each step generates outputs that can be used in subsequent steps
+            - You can upload previously generated files at any step
+            - Use the "Clear All Data" button in the sidebar to reset the application
+            """
+        )
 
-# The radio button selection remains outside the expander
-current_tab = st.radio(
-    "Select section:",
-    [
-        "(1)🔍 Scrape Reports",
-        "(2)📂 Scraped File Preparation",
-        "(3)📊 Scraped File Analysis",
-        "(4)📝 Topic Analysis & Summaries", 
-        "(5)🔬 Concept Annotation",
-        "(6)📈 Theme Analysis Dashboard",
-    ],
-    label_visibility="collapsed",
-    horizontal=True,
-    key="main_tab_selector",
-)
-st.markdown("---")
+    # The radio button selection remains outside the expander
+    current_tab = st.radio(
+        "Select section:",
+        [
+            "(1)🔍 Scrape Reports",
+            "(2)📂 Scraped File Preparation",
+            "(3)📊 Scraped File Analysis",
+            "(4)📝 Topic Analysis & Summaries", 
+            "(5)🔬 Concept Annotation",
+            "(6)📈 Theme Analysis Dashboard",
+        ],
+        label_visibility="collapsed",
+        horizontal=True,
+        key="main_tab_selector",
+    )
+    st.markdown("---")
 
     try:
         if current_tab == "(1)🔍 Scrape Reports":
+            # Add tab-specific description here
+            st.markdown(
+                """
+                Search tool for Prevention of Future Deaths (PFD) reports from the UK Judiciary website.
+
+                - Extract detailed PFD reports with metadata, full content, and associated PDFs
+                - Filtering by keywords, categories, and date ranges
+                - Export options in CSV and Excel formats
+
+                Handling Large Result Sets: For extensive search results, use the 'Start page' and 'End page' number inputs to download reports in manageable batches.
+                """
+            )
             render_scraping_tab()
         
         elif current_tab == "(2)📂 Scraped File Preparation":
@@ -9956,7 +9964,7 @@ st.markdown("---")
             if not validate_data_state():
                 handle_no_data_state("analysis")
             else:
-                render_analysis_tab(st.session_state.current_data)
+                render_analysis_tab2(st.session_state.current_data)
         
         elif current_tab == "(4)📝 Topic Analysis & Summaries":
             # Add tab-specific description here
@@ -9991,21 +9999,16 @@ st.markdown("---")
             # Add tab-specific description here
             st.markdown(
                 """
-                ## Interactive Theme Analysis Dashboard
-                Visualise and explore theme patterns across your Prevention of Future Deaths (PFD) reports.
+                Interactive Theme Analysis Dashboard
                 
-                - Upload your theme analysis results from step (5) (file named annotated_theme_analysis_*.xlsx)
+                - Upload theme analysis results from step (5) (file named annotated_theme_analysis_*.xlsx)
                 - Navigate through multiple visualization tabs: framework heatmaps, distribution charts, temporal analysis and more
                 - Filter results by framework, year, coroner area, and confidence level
-                - Discover relationships between themes using correlation analysis and network visualizations
-                - Export filtered data for further analysis
-                
-                Start by uploading your theme analysis file to generate comprehensive visualizations.
+                - Discover relationships between themes using correlation analysis
                 """
             )
             render_theme_analysis_dashboard(st.session_state.current_data)
 
-        # Sidebar data management
         # Sidebar data management
         with st.sidebar:
             st.header("Data Management")
@@ -10096,7 +10099,6 @@ st.markdown("---")
         
         # Render footer even when an exception occurs
         render_footer()
-
 
 if __name__ == "__main__":
     try:
