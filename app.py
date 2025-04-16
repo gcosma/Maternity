@@ -9874,42 +9874,52 @@ def main():
     
     # Add collapsible help section
     with st.expander("💡 How to Use This Tool"):
-        st.markdown(
-            """
-            ### Complete Analysis Pipeline:
-            
-            1. **(1) 🔍 Scrape Reports**: Start by collecting PFD reports from the UK Judiciary website
-            2. **(2) 📂 Scraped File Preparation**: Process and merge your scraped reports
-            3. **(3) 📊 Scraped File Analysis**: Visualize and analyze basic report patterns
-            4. **(4) 📝 Topic Analysis & Summaries**: Generate basic themes from report content
-            5. **(5) 🔬 Concept Annotation**: Conduct advanced theme analysis with AI
-            6. **(6) 📈 Theme Analysis Dashboard**: Explore comprehensive theme visualizations
-            
-            Select each numbered tab in sequence to move through the complete analysis pipeline.
-            
-            ### Tips:
-            - Each step generates outputs that can be used in subsequent steps
-            - You can upload previously generated files at any step
-            - Use the "Clear All Data" button in the sidebar to reset the application
-            """
-        )
+st.markdown(
+    """
+    ## UK Judiciary PFD Reports Analysis Tool
     
-        # Updated tab selection with the new BERT File Merger tab
-        current_tab = st.radio(
-            "Select section:",
-            [
-                "(1)🔍 Scrape Reports",
-                "(2)📂 Scraped File Preparation",
-                "(3)📊 Scraped File Analysis",
-                "(4)📝 Topic Analysis & Summaries", 
-                "(5)🔬 Concept Annotation",
-                "(6)📈 Theme Analysis Dashboard",
-            ],
-            label_visibility="collapsed",
-            horizontal=True,
-            key="main_tab_selector",
-        )
-        st.markdown("---")
+    This application analyzes Prevention of Future Deaths (PFD) reports from the UK Judiciary website to uncover patterns, themes, and insights that can help prevent future deaths.
+    """
+)
+
+# Add collapsible help section
+with st.expander("💡 How to Use This Tool"):
+    st.markdown(
+        """
+        ### Complete Analysis Pipeline:
+        
+        1. **(1) 🔍 Scrape Reports**: Start by collecting PFD reports from the UK Judiciary website
+        2. **(2) 📂 Scraped File Preparation**: Process and merge your scraped reports
+        3. **(3) 📊 Scraped File Analysis**: Visualize and analyze basic report patterns
+        4. **(4) 📝 Topic Analysis & Summaries**: Generate basic themes from report content
+        5. **(5) 🔬 Concept Annotation**: Conduct advanced theme analysis with AI
+        6. **(6) 📈 Theme Analysis Dashboard**: Explore comprehensive theme visualizations
+        
+        Select each numbered tab in sequence to move through the complete analysis pipeline.
+        
+        ### Tips:
+        - Each step generates outputs that can be used in subsequent steps
+        - You can upload previously generated files at any step
+        - Use the "Clear All Data" button in the sidebar to reset the application
+        """
+    )
+
+# The radio button selection remains outside the expander
+current_tab = st.radio(
+    "Select section:",
+    [
+        "(1)🔍 Scrape Reports",
+        "(2)📂 Scraped File Preparation",
+        "(3)📊 Scraped File Analysis",
+        "(4)📝 Topic Analysis & Summaries", 
+        "(5)🔬 Concept Annotation",
+        "(6)📈 Theme Analysis Dashboard",
+    ],
+    label_visibility="collapsed",
+    horizontal=True,
+    key="main_tab_selector",
+)
+st.markdown("---")
 
     try:
         if current_tab == "(1)🔍 Scrape Reports":
