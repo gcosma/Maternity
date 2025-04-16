@@ -9875,7 +9875,7 @@ def main():
     # Add main description
     st.markdown(
         """
-        This application analyzes Prevention of Future Deaths (PFD) reports from the UK Judiciary website to uncover patterns, themes, and insights.
+        This application analyses Prevention of Future Deaths (PFD) reports from the UK Judiciary website to uncover patterns, themes, and insights.
         """
     )
     
