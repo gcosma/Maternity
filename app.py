@@ -9911,18 +9911,6 @@ def main():
 
     try:
         if current_tab == "(1)🔍 Scrape Reports":
-            # Add tab-specific description here
-            st.markdown(
-                """
-                Search tool for Prevention of Future Deaths (PFD) reports from the UK Judiciary website.
-
-                - Extract detailed PFD reports with metadata, full content, and associated PDFs
-                - Filtering by keywords, categories, and date ranges
-                - Export options in CSV and Excel formats
-
-                Handling Large Result Sets: For extensive search results, use the 'Start page' and 'End page' number inputs to download reports in manageable batches (ideally no more than 5 pages per batch). The outputs of every batch will be displayed in a single excel file. 
-                """
-            )
             render_scraping_tab()
         
         elif current_tab == "(2)📂 Scraped File Preparation":
