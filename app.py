@@ -8673,7 +8673,7 @@ def render_filter_data_tab():
 
 
 ###
-def render_analysis_tab2(data: pd.DataFrame = None):
+def render_analysis_tab(data: pd.DataFrame = None):
     """Render the analysis tab with improved filters, file upload functionality, and analysis sections"""
 
     # Add file upload section at the top
