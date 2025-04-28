@@ -4966,7 +4966,7 @@ def render_scraping_tab():
     # Initialize default values if not in session state
     if "init_done" not in st.session_state:
         st.session_state.init_done = True
-        st.session_state["search_keyword_default"] = ""  # Changed from "report" to empty string
+        st.session_state["search_keyword_default"] = ""
         st.session_state["category_default"] = ""
         st.session_state["order_default"] = "relevance"
         st.session_state["start_page_default"] = 1
@@ -4994,17 +4994,15 @@ def render_scraping_tab():
 
     # Create the search form with page range selection and batch options
     with st.form("scraping_form"):
-        # Create two rows with two columns each
+        # Create rows for the main search criteria
         row1_col1, row1_col2 = st.columns(2)
         row2_col1, row2_col2 = st.columns(2)
-        row3_col1, row3_col2 = st.columns(2)
-        row4_col1, row4_col2 = st.columns(2)
 
-        # First row
+        # First row - Main search criteria
         with row1_col1:
             search_keyword = st.text_input(
                 "Search keywords:",
-                value=st.session_state.get("search_keyword_default", ""),  # Changed default to empty
+                value=st.session_state.get("search_keyword_default", ""),
                 key="search_keyword",
                 help="Do not leave empty, use 'report' or another search term",
             )
@@ -5018,7 +5016,7 @@ def render_scraping_tab():
                 format_func=lambda x: x if x else "Select element",
             )
 
-        # Second row
+        # Second row - Sort by
         with row2_col1:
             order = st.selectbox(
                 "Sort by:",
@@ -5030,85 +5028,6 @@ def render_scraping_tab():
                     "desc": "Newest first",
                     "asc": "Oldest first",
                 }[x],
-            )
-
-        with row2_col2:
-            # Get total pages for the query (preview)
-            if search_keyword or category:
-                base_url = "https://www.judiciary.uk/"
-
-                # Prepare category slug
-                category_slug = None
-                if category:
-                    category_slug = (
-                        category.lower()
-                        .replace(" ", "-")
-                        .replace("&", "and")
-                        .replace("--", "-")
-                        .strip("-")
-                    )
-
-                # Create preview URL
-                preview_url = construct_search_url(
-                    base_url=base_url,
-                    keyword=search_keyword,
-                    category=category,
-                    category_slug=category_slug,
-                )
-
-                try:
-                    with st.spinner("Checking total pages..."):
-                        total_pages, total_results = get_total_pages(preview_url)
-                        if total_pages > 0:
-                            st.info(
-                                f"This search has {total_pages} pages with {total_results} results"
-                            )
-                            st.session_state["total_pages_preview"] = total_pages
-                        else:
-                            st.warning("No results found for this search")
-                            st.session_state["total_pages_preview"] = 0
-                except Exception as e:
-                    st.error(f"Error checking pages: {str(e)}")
-                    st.session_state["total_pages_preview"] = 0
-            else:
-                st.session_state["total_pages_preview"] = 0
-
-        # Third row for page range
-        with row3_col1:
-            start_page = st.number_input(
-                "Start page:",
-                min_value=1,
-                value=st.session_state.get("start_page_default", 1),
-                key="start_page",
-                help="First page to scrape (minimum 1)",
-            )
-
-        with row3_col2:
-            end_page = st.number_input(
-                "End page (Optimal: 10 pages per extraction):",
-                min_value=0,
-                value=st.session_state.get("end_page_default", 0),
-                key="end_page",
-                help="Last page to scrape (0 for all pages)",
-            )
-
-        # Fourth row for batch options
-        with row4_col1:
-            auto_save_batches = st.checkbox(
-                "Auto-save batches",
-                value=st.session_state.get("auto_save_batches_default", True),
-                key="auto_save_batches",
-                help="Automatically save results in batches as they are scraped",
-            )
-
-        with row4_col2:
-            batch_size = st.number_input(
-                "Pages per batch: (ideally set to 5)",
-                min_value=1,
-                max_value=10,
-                value=st.session_state.get("batch_size_default", 5),
-                key="batch_size",
-                help="Number of pages to process before saving a batch",
             )
             
         # Date filter section
@@ -5176,6 +5095,99 @@ def render_scraping_tab():
                 max_value=2025,
                 value=0,
                 key="before_year"
+            )
+
+        # Create date filter strings for preview
+        after_date = None
+        if after_day > 0 and after_month > 0 and after_year > 0:
+            after_date = f"{after_day}-{after_month}-{after_year}"
+            
+        before_date = None
+        if before_day > 0 and before_month > 0 and before_year > 0:
+            before_date = f"{before_day}-{before_month}-{before_year}"
+
+        # Display preview results count with date filters
+        if search_keyword or category or after_date or before_date:
+            base_url = "https://www.judiciary.uk/"
+
+            # Prepare category slug
+            category_slug = None
+            if category:
+                category_slug = (
+                    category.lower()
+                    .replace(" ", "-")
+                    .replace("&", "and")
+                    .replace("--", "-")
+                    .strip("-")
+                )
+
+            # Create preview URL with date filters
+            preview_url = construct_search_url(
+                base_url=base_url,
+                keyword=search_keyword,
+                category=category,
+                category_slug=category_slug,
+                after_date=after_date,
+                before_date=before_date,
+            )
+
+            try:
+                with st.spinner("Checking total pages..."):
+                    total_pages, total_results = get_total_pages(preview_url)
+                    if total_pages > 0:
+                        st.info(
+                            f"After filtering, this search has {total_pages} pages with {total_results} results"
+                        )
+                        st.session_state["total_pages_preview"] = total_pages
+                    else:
+                        st.warning("No results found for this search with the current filters")
+                        st.session_state["total_pages_preview"] = 0
+            except Exception as e:
+                st.error(f"Error checking pages: {str(e)}")
+                st.session_state["total_pages_preview"] = 0
+        else:
+            st.session_state["total_pages_preview"] = 0
+            
+        # Page settings AFTER filter search
+        row3_col1, row3_col2 = st.columns(2)
+        row4_col1, row4_col2 = st.columns(2)
+
+        # Page range row - MOVED to after filter search
+        with row3_col1:
+            start_page = st.number_input(
+                "Start page:",
+                min_value=1,
+                value=st.session_state.get("start_page_default", 1),
+                key="start_page",
+                help="First page to scrape (minimum 1)",
+            )
+
+        with row3_col2:
+            end_page = st.number_input(
+                "End page (Optimal: 10 pages per extraction):",
+                min_value=0,
+                value=st.session_state.get("end_page_default", 0),
+                key="end_page",
+                help="Last page to scrape (0 for all pages)",
+            )
+
+        # Batch options row - MOVED to after filter search
+        with row4_col1:
+            auto_save_batches = st.checkbox(
+                "Auto-save batches",
+                value=st.session_state.get("auto_save_batches_default", True),
+                key="auto_save_batches",
+                help="Automatically save results in batches as they are scraped",
+            )
+
+        with row4_col2:
+            batch_size = st.number_input(
+                "Pages per batch: (ideally set to 5)",
+                min_value=1,
+                max_value=10,
+                value=st.session_state.get("batch_size_default", 5),
+                key="batch_size",
+                help="Number of pages to process before saving a batch",
             )
 
         # Action buttons in a row
@@ -5257,9 +5269,6 @@ def render_scraping_tab():
             st.error(f"An error occurred: {e}")
             logging.error(f"Scraping error: {e}")
             return False
-
-
-
 
 
 def render_topic_summary_tab(data: pd.DataFrame = None) -> None:
