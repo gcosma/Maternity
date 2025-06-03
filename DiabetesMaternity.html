@@ -1,0 +1,630 @@
+
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Theme Analysis Report</title>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1">
+                <style>
+                    body { 
+                        font-family: Arial, sans-serif; 
+                        line-height: 1.6; 
+                        margin: 0;
+                        padding: 20px;
+                        color: #333;
+                        background-color: #f9f9f9;
+                    }
+                    h1 { 
+                        color: #2c3e50; 
+                        border-bottom: 3px solid #3498db; 
+                        padding-bottom: 10px; 
+                        margin-top: 30px;
+                        font-weight: 600;
+                    }
+                    h2 { 
+                        color: #2c3e50; 
+                        margin-top: 30px; 
+                        border-bottom: 2px solid #bdc3c7; 
+                        padding-bottom: 5px; 
+                        font-weight: 600;
+                    }
+                    h3 {
+                        color: #34495e;
+                        font-weight: 600;
+                        margin-top: 20px;
+                    }
+                    .record-container { 
+                        margin-bottom: 40px; 
+                        background-color: white;
+                        border-radius: 8px;
+                        box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+                        padding: 20px;
+                        page-break-after: always; 
+                    }
+                    .highlighted-text { 
+                        margin: 15px 0; 
+                        padding: 15px; 
+                        border-radius: 4px;
+                        border: 1px solid #ddd; 
+                        background-color: #fff; 
+                        line-height: 1.7;
+                    }
+                    .theme-info { margin: 15px 0; }
+                    .theme-info table { 
+                        border-collapse: collapse; 
+                        width: 100%; 
+                        margin-top: 15px;
+                        border-radius: 4px;
+                        overflow: hidden;
+                    }
+                    .theme-info th, .theme-info td { 
+                        border: 1px solid #ddd; 
+                        padding: 12px; 
+                        text-align: left; 
+                    }
+                    .theme-info th { 
+                        background-color: #3498db; 
+                        color: white;
+                        font-weight: 600;
+                    }
+                    .theme-info tr:nth-child(even) { background-color: #f9f9f9; }
+                    .theme-info tr:hover { background-color: #f1f1f1; }
+                    .high-confidence { background-color: #D5F5E3; }  /* Light green */
+                    .medium-confidence { background-color: #FCF3CF; } /* Light yellow */
+                    .low-confidence { background-color: #FADBD8; }   /* Light red */
+                    .report-header {
+                        background-color: #3498db;
+                        color: white;
+                        padding: 30px;
+                        text-align: center;
+                        border-radius: 8px;
+                        margin-bottom: 30px;
+                    }
+                    .summary-card {
+                        background-color: white;
+                        border-radius: 8px;
+                        box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+                        padding: 20px;
+                        margin-bottom: 30px;
+                        display: flex;
+                        flex-wrap: wrap;
+                        justify-content: space-between;
+                    }
+                    .summary-box {
+                        flex: 1;
+                        min-width: 200px;
+                        padding: 15px;
+                        text-align: center;
+                        border-right: 1px solid #eee;
+                    }
+                    .summary-box:last-child {
+                        border-right: none;
+                    }
+                    .summary-number {
+                        font-size: 36px;
+                        font-weight: bold;
+                        color: #3498db;
+                        margin-bottom: 10px;
+                    }
+                    .summary-label {
+                        font-size: 14px;
+                        color: #7f8c8d;
+                        text-transform: uppercase;
+                    }
+                    .theme-color-box {
+                        display: inline-block;
+                        width: 20px;
+                        height: 20px;
+                        margin-right: 5px;
+                        vertical-align: middle;
+                        border: 1px solid #999;
+                    }
+                    .legend-container {
+                        background-color: white;
+                        border-radius: 8px;
+                        box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+                        padding: 15px;
+                        margin-bottom: 20px;
+                    }
+                    .legend-title {
+                        font-weight: bold;
+                        margin-bottom: 10px;
+                    }
+                    .legend-item {
+                        display: flex;
+                        align-items: center;
+                        margin-bottom: 5px;
+                    }
+                    @media print {
+                        .record-container { page-break-after: always; }
+                        body { background-color: white; }
+                        .record-container, .summary-card { box-shadow: none; }
+                    }
+                    
+                    /* Define theme-specific CSS classes for consistency */
+        
+                    .theme-i-sirch_organisation---national-and/or-local-guidance {
+                        background-color: #FFF3CD !important;
+                    }
+            
+                    .theme-house-of-commons_fragmented-care {
+                        background-color: #FFECB3 !important;
+                    }
+            
+                    .theme-house-of-commons_care-quality-and-access-issues {
+                        background-color: #FFF3E0 !important;
+                    }
+            
+                    .theme-i-sirch_person---patient-characteristics-and-performance---characteristics---record-of-attendance-eg-failure-to-attend-antenatal-classes {
+                        background-color: #F8D7DA !important;
+                    }
+            
+                    .theme-house-of-commons_socioeconomic-factors-and-deprivation {
+                        background-color: #E0F7FA !important;
+                    }
+            
+                    .theme-house-of-commons_inadequate-maternity-care {
+                        background-color: #F3E5F5 !important;
+                    }
+            
+                    .theme-extended-analysis_diagnostic-testing-and-specimen-handling {
+                        background-color: #D1ECF1 !important;
+                    }
+            
+                    .theme-i-sirch_jobs/task---care-planning {
+                        background-color: #FFD580 !important;
+                    }
+            
+                    .theme-i-sirch_person---patient-characteristics-and-performance---characteristics---training-and-education-eg-attendance-at-ante-natal-classes {
+                        background-color: #D1E7DD !important;
+                    }
+            
+                    .theme-house-of-commons_guidance-gaps {
+                        background-color: #E1F5FE !important;
+                    }
+            
+                    .theme-i-sirch_external---geographical-factor-eg-location-of-patient {
+                        background-color: #e7b8d7 !important;
+                    }
+            
+                </style>
+            </head>
+            <body>
+                <div class="report-header">
+                    <h1>Theme Analysis Results</h1>
+                    <p>Generated on 03 June 2025, 18:11</p>
+                </div>
+                
+                <div class="summary-card">
+                    <div class="summary-box">
+                        <div class="summary-number">1</div>
+                        <div class="summary-label">Documents Analyzed</div>
+                    </div>
+                    <div class="summary-box">
+                        <div class="summary-number">11</div>
+                        <div class="summary-label">Theme Identifications</div>
+                    </div>
+                    <div class="summary-box">
+                        <div class="summary-number">3</div>
+                        <div class="summary-label">Frameworks</div>
+                    </div>
+                </div>
+                
+                <!-- Add legend explaining gradients -->
+                <div class="legend-container">
+                    <div class="legend-title">Theme Color Guide</div>
+                    <div>When text contains multiple themes, a gradient background is used to show all applicable themes. Check the tooltip for details.</div>
+                </div>
+            
+                <h2>Framework Summary</h2>
+                <table class="theme-info">
+                    <tr>
+                        <th>Framework</th>
+                        <th>Number of Themes</th>
+                        <th>Number of Documents</th>
+                    </tr>
+            
+                    <tr>
+                        <td>I-SIRch</td>
+                        <td>5</td>
+                        <td>1</td>
+                    </tr>
+                
+                    <tr>
+                        <td>House of Commons</td>
+                        <td>5</td>
+                        <td>1</td>
+                    </tr>
+                
+                    <tr>
+                        <td>Extended Analysis</td>
+                        <td>1</td>
+                        <td>1</td>
+                    </tr>
+                
+                </table>
+            <h2>Document Analysis</h2>
+                    <div class="record-container">
+                        <h2>Document: Eclipse Morrison: Prevention of future deaths report</h2>
+                        
+                        <div class="theme-info">
+                            <h3>Identified Themes</h3>
+                            <table>
+                                <tr>
+                                    <th>Framework</th>
+                                    <th>Theme</th>
+                                    <th>Confidence</th>
+                                    <th>Score</th>
+                                    <th>Matched Keywords</th>
+                                    <th>Color</th>
+                                </tr>
+                    
+                                <tr style="background-color: #D1ECF1;">
+                                    <td>Extended Analysis</td>
+                                    <td>Diagnostic Testing and Specimen Handling</td>
+                                    <td>High</td>
+                                    <td>0.852</td>
+                                    <td>analysis, interpretation</td>
+                                    <td><div class="theme-color-box" style="background-color:#D1ECF1;"></div></td>
+                                </tr>
+                        
+                                <tr style="background-color: #E1F5FE;">
+                                    <td>House of Commons</td>
+                                    <td>Guidance gaps</td>
+                                    <td>High</td>
+                                    <td>0.886</td>
+                                    <td>information, guidance</td>
+                                    <td><div class="theme-color-box" style="background-color:#E1F5FE;"></div></td>
+                                </tr>
+                        
+                                <tr style="background-color: #FFECB3;">
+                                    <td>House of Commons</td>
+                                    <td>Fragmented care</td>
+                                    <td>High</td>
+                                    <td>0.883</td>
+                                    <td>clear, care</td>
+                                    <td><div class="theme-color-box" style="background-color:#FFECB3;"></div></td>
+                                </tr>
+                        
+                                <tr style="background-color: #FFF3E0;">
+                                    <td>House of Commons</td>
+                                    <td>Care quality and access issues</td>
+                                    <td>High</td>
+                                    <td>0.881</td>
+                                    <td>access, quality, treatment</td>
+                                    <td><div class="theme-color-box" style="background-color:#FFF3E0;"></div></td>
+                                </tr>
+                        
+                                <tr style="background-color: #F3E5F5;">
+                                    <td>House of Commons</td>
+                                    <td>Inadequate maternity care</td>
+                                    <td>High</td>
+                                    <td>0.868</td>
+                                    <td>maternity, care</td>
+                                    <td><div class="theme-color-box" style="background-color:#F3E5F5;"></div></td>
+                                </tr>
+                        
+                                <tr style="background-color: #E0F7FA;">
+                                    <td>House of Commons</td>
+                                    <td>Socioeconomic factors and deprivation</td>
+                                    <td>High</td>
+                                    <td>0.863</td>
+                                    <td>factors</td>
+                                    <td><div class="theme-color-box" style="background-color:#E0F7FA;"></div></td>
+                                </tr>
+                        
+                                <tr style="background-color: #FFF3CD;">
+                                    <td>I-SIRch</td>
+                                    <td>Organisation - National and/or local guidance</td>
+                                    <td>High</td>
+                                    <td>0.884</td>
+                                    <td>guidance</td>
+                                    <td><div class="theme-color-box" style="background-color:#FFF3CD;"></div></td>
+                                </tr>
+                        
+                                <tr style="background-color: #D1E7DD;">
+                                    <td>I-SIRch</td>
+                                    <td>Person - Patient (characteristics and performance) - Characteristics - Training and education (e.g., attendance at ante-natal classes)</td>
+                                    <td>High</td>
+                                    <td>0.876</td>
+                                    <td>training, education</td>
+                                    <td><div class="theme-color-box" style="background-color:#D1E7DD;"></div></td>
+                                </tr>
+                        
+                                <tr style="background-color: #FFD580;">
+                                    <td>I-SIRch</td>
+                                    <td>Jobs/Task - Care planning</td>
+                                    <td>High</td>
+                                    <td>0.872</td>
+                                    <td>care, planning</td>
+                                    <td><div class="theme-color-box" style="background-color:#FFD580;"></div></td>
+                                </tr>
+                        
+                                <tr style="background-color: #F8D7DA;">
+                                    <td>I-SIRch</td>
+                                    <td>Person - Patient (characteristics and performance) - Characteristics - Record of attendance (e.g., failure to attend antenatal classes)</td>
+                                    <td>High</td>
+                                    <td>0.865</td>
+                                    <td>record</td>
+                                    <td><div class="theme-color-box" style="background-color:#F8D7DA;"></div></td>
+                                </tr>
+                        
+                                <tr style="background-color: #e7b8d7;">
+                                    <td>I-SIRch</td>
+                                    <td>External - Geographical factor (e.g. Location of patient)</td>
+                                    <td>High</td>
+                                    <td>0.86</td>
+                                    <td>factor</td>
+                                    <td><div class="theme-color-box" style="background-color:#e7b8d7;"></div></td>
+                                </tr>
+                        
+                            </table>
+                        </div>
+                        
+                        <div class="highlighted-text">
+                            <h3>Text with Highlighted Keywords</h3>
+                    
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <title>Highlighted Document Analysis</title>
+            <style>
+                body {
+                    font-family: Arial, sans-serif;
+                    margin: 20px;
+                    line-height: 1.6;
+                }
+                table {
+                    width: 100%;
+                    border-collapse: collapse;
+                    margin-bottom: 20px;
+                }
+                th, td {
+                    border: 1px solid #ddd;
+                    padding: 8px;
+                    text-align: left;
+                }
+                th {
+                    background-color: #f2f2f2;
+                    font-weight: bold;
+                }
+                .paragraph-container {
+                    border: 1px solid #ddd;
+                    padding: 15px;
+                    margin-bottom: 20px;
+                    background-color: #f9f9f9;
+                }
+            </style>
+        </head>
+        <body>
+            <h2>Document Theme Analysis</h2>
+            
+            <div class="paragraph-container">
+                <h3>Highlighted Text</h3>
+                <p>
+        are as follows - Evidence was given at the inquest and it is accepted, that many of the concerns identified in relation to Eclipse's birth have now been addressed, but some remain. 1. <span style="background-color:#D1ECF1; border:1px solid #666; border-radius:2px; padding:1px 2px;" title="Theme: Extended Analysis_Diagnostic Testing and Specimen Handling + I-SIRch_External - Geographical factor (e.g. Location of patient)
+Keywords: analysis + factor">Risk analysis / mode and timing of birth A significant factor was the failure to consider an elective Caesarean Section (CS).</span> <span style="background-color:#FFECB3; border:1px solid #666; border-radius:2px; padding:1px 2px;" title="Theme: House of Commons_Fragmented care
+Keywords: clear">It is not clear why on this history and consideration of mode of delivery did not include a consideration of an elective CS at any stage, by any of the doctors involved.</span> Evidence was given that existing policies in place at GEH were not followed and the reason for this failure has not been identified. Whilst Badgernet could be a useful tool, the evidence suggested that it is being regarded as a first line of defence rather than a failsafe. <span style="background-color:#F3E5F5; border:1px solid #666; border-radius:2px; padding:1px 2px;" title="Theme: House of Commons_Inadequate maternity care
+Keywords: maternity">I am told that the Badgernet maternity system implemented in October 2021 will resolve the problems relating to mode and timing of birth, in that the system will require a consultant to approve a decision for CS/induction of labour (IOL) and that IOL's will not be approved by the labour ward coordinator unless the paper booking has been approved on paper.</span> <span style="background-color:#FFECB3; border:1px solid #666; border-radius:2px; padding:1px 2px;" title="Theme: House of Commons_Fragmented care + House of Commons_Socioeconomic factors and deprivation
+Keywords: clear + factors">However, on the evidence received it is not clear how this will assist if the risk factors and the need to consider IOL/elective CS have not been identified, by junior staff, thus triggering the need for escalation to/approval by a consultant.</span> <span style="background-color:#FFECB3; border:1px solid #666; border-radius:2px; padding:1px 2px;" title="Theme: House of Commons_Fragmented care + House of Commons_Socioeconomic factors and deprivation
+Keywords: clear + factors">I am not clear what has been done to ensure that junior doctors and locums have sufficient technical knowledge to ensure that they are able to identify serious risk factors and alert the consultant to these, so that the consultant may consider the appropriate mode of delivery.</span> <span style="background-color:#E1F5FE; border:1px solid #666; border-radius:2px; padding:1px 2px;" title="Theme: House of Commons_Guidance gaps + I-SIRch_Person - Patient (characteristics and performance) - Characteristics - Training and education (e.g., attendance at ante-natal classes)
+Keywords: information + training">No information was provided as to the availability of regular face to face training for all grades concerning high-risk pregnancies not just for career trainees and foundation doctors.</span> <span style="background-color:#E1F5FE; border:1px solid #666; border-radius:2px; padding:1px 2px;" title="Theme: House of Commons_Guidance gaps
+Keywords: information">I am told that a memo was sent to all junior doctors reminding them that any plan for either IOL or elective CS must be approved by a consultant and that an induction pack containing that information is provided to new starters and locums.</span> <span style="background-color:#D1E7DD; border:1px solid #666; border-radius:2px; padding:1px 2px;" title="Theme: I-SIRch_Person - Patient (characteristics and performance) - Characteristics - Training and education (e.g., attendance at ante-natal classes)
+Keywords: education">I have seen the Women's and Children Clinical Education Guideline introduced in November 2022.</span> <span style="background-color:#E1F5FE; border:1px solid #666; border-radius:2px; padding:1px 2px;" title="Theme: House of Commons_Guidance gaps
+Keywords: information">I am told that the information was placed in a prominent position on notice boards, staff rooms and in blogs.</span> <span style="background-color:#FFECB3; border:1px solid #666; border-radius:2px; padding:1px 2px;" title="Theme: House of Commons_Fragmented care
+Keywords: clear">It is not clear how the assimilation of this knowledge is tested.</span> It was suggested that this may be in appraisal, but this seems only likely to identify problems after they arise. <span style="background-color:#FFECB3; border:1px solid #666; border-radius:2px; padding:1px 2px;" title="Theme: House of Commons_Fragmented care + House of Commons_Guidance gaps + House of Commons_Inadequate maternity care + House of Commons_Socioeconomic factors and deprivation + I-SIRch_Jobs/Task - Care planning
+Keywords: care + information + care + factors + care">In any event it seems these methods of dissemination of information and the appraisal system were in place at the time of Eclipse's birth but did not ensure that the doctors involved in her mother's care appreciated the impact of the risk factors in this pregnancy.</span> <span style="background-color:#FFD580; border:1px solid #666; border-radius:2px; padding:1px 2px;" title="Theme: I-SIRch_Jobs/Task - Care planning
+Keywords: planning">It was not explained how Badgernet or any policy or procedure in place, would ensure that there is a holistic review (including ultrasound scan findings) when planning for timing and mode of birth.</span> The concern remains that there will be further failure to ensure that appropriate timing and mode of delivery will be provided in high-risk pregnancies. 2. <span style="background-color:#FFF3E0; border:1px solid #666; border-radius:2px; padding:1px 2px;" title="Theme: House of Commons_Care quality and access issues
+Keywords: access">Access to Badgernet portal / full implementation of the Badgernet software It seems that the Badgernet system is being relied on to address a number of issues which were identified in this case, and heavy reliance is being placed on a system which is not yet fully implemented.</span> <span style="background-color:#FFF3E0; border:1px solid #666; border-radius:2px; padding:1px 2px;" title="Theme: House of Commons_Care quality and access issues
+Keywords: access">The concern remains that a critical aspect of this system, access to the portal, will not be in place until autumn of 2023 at the earliest. 3.</span> <span style="background-color:#FFF3E0; border:1px solid #666; border-radius:2px; padding:1px 2px;" title="Theme: House of Commons_Care quality and access issues + I-SIRch_Person - Patient (characteristics and performance) - Characteristics - Record of attendance (e.g., failure to attend antenatal classes)
+Keywords: quality + record">Quality Assessment I am informed that Badgernet can easily identify fields which have not been completed and will prevent a record being closed until the field is completed, but it cannot identify the quality of any such entries.</span> <span style="background-color:#FFF3E0; border:1px solid #666; border-radius:2px; padding:1px 2px;" title="Theme: House of Commons_Care quality and access issues
+Keywords: quality">I am told that the quality checks are made on ten sets of notes per month out of an estimated 3,000 records that will be open at any one time.</span> <span style="background-color:#FFF3E0; border:1px solid #666; border-radius:2px; padding:1px 2px;" title="Theme: House of Commons_Care quality and access issues
+Keywords: quality">The concern remains that there is insufficient quality assurance in this system. 4.</span> Procedure for escalating concerns arising out of Ultrasound Scans (USS) I understand that the procedure for escalating concerns arising out of a USS where it is not possible to obtain an accurate measurement in a high-risk pregnancy is currently under review. I am told that the new policy is not in place. The concern remains that no date has been set for its implementation. 5. Counselling for mothers at increased risk of shoulder dystocia I have not seen any indication that all mothers identified to have an increased chance of shoulder dystocia now receive counselling regarding the risks and benefits associated with vaginal birth or CS. Assisting mothers to understand the implications of risks they face is fundamental to supporting them to make fully informed decisions, in accordance with Montgomery. <span style="background-color:#FFECB3; border:1px solid #666; border-radius:2px; padding:1px 2px;" title="Theme: House of Commons_Fragmented care
+Keywords: clear">The concern remains that there is no clear plan in place to ensure mothers receive the support they require to make fully informed decisions in relation to mode of delivery where there is risk of shoulder dystocia. 6.</span> <span style="background-color:#D1ECF1; border:1px solid #666; border-radius:2px; padding:1px 2px;" title="Theme: Extended Analysis_Diagnostic Testing and Specimen Handling + House of Commons_Care quality and access issues + House of Commons_Fragmented care + House of Commons_Inadequate maternity care + I-SIRch_Jobs/Task - Care planning
+Keywords: interpretation + treatment + care + care + care">Interpretation of Montgomery Ante-natal care is unique in that decisions have to be made for the benefit of two patients (the mother and the baby) and the treatment options for each may, as in this case have competing risks and benefits.</span> <span style="background-color:#FFECB3; border:1px solid #666; border-radius:2px; padding:1px 2px;" title="Theme: House of Commons_Fragmented care + House of Commons_Inadequate maternity care + I-SIRch_Jobs/Task - Care planning
+Keywords: care + care + care">In addition, in ante-natal care, the circumstances may change and action may need to be taken very quickly.</span> On the basis of evidence given at the inquest, there seems to be a lack of clarity as to the way in which Montgomery guidelines are interpreted. <span style="background-color:#E0F7FA; border:1px solid #666; border-radius:2px; padding:1px 2px;" title="Theme: House of Commons_Socioeconomic factors and deprivation
+Keywords: factors">It was acknowledged in evidence that parents often want a steer as to the best/safest course of action and that may require medical professionals to express opinions as to the weight to be placed on different risk factors.</span> In some cases, parents may prefer to rely on the viewpoint of an experienced medical professional. It seems that medical professionals do not feel they can offer this assistance as it might be interpreted as trying to impose their opinion on the parent. <span style="background-color:#E1F5FE; border:1px solid #666; border-radius:2px; padding:1px 2px;" title="Theme: House of Commons_Guidance gaps + I-SIRch_Organisation - National and/or local guidance + I-SIRch_Person - Patient (characteristics and performance) - Characteristics - Training and education (e.g., attendance at ante-natal classes)
+Keywords: guidance + guidance + training">The way in which Montgomery is interpreted and the extent to which medical professionals can offer an opinion is of wider concern than just the actions of those at GEH and should be considered by those who produce the guidance and deliver training to medical professionals.</span>
+                </p>
+            </div>
+            
+            <table>
+                <thead>
+                    <tr>
+                        <th>Framework</th>
+                        <th>Theme</th>
+                        <th>Color</th>
+                        <th>Matched Keywords</th>
+                        <th>Extracted Sentence</th>
+                    </tr>
+                </thead>
+                <tbody>
+        
+                    <tr>
+                        <td>Extended Analysis</td>
+                        <td>Diagnostic Testing and Specimen Handling + I-SIRch_External - Geographical factor (e.g. Location of patient)</td>
+                        <td style="background-color: #D1ECF1;">#D1ECF1</td>
+                        <td>analysis + factor</td>
+                        <td>Risk analysis / mode and timing of birth A significant factor was the failure to consider an elective Caesarean Section (CS).</td>
+                    </tr>
+            
+                    <tr>
+                        <td>House of Commons</td>
+                        <td>Fragmented care</td>
+                        <td style="background-color: #FFECB3;">#FFECB3</td>
+                        <td>clear</td>
+                        <td>It is not clear why on this history and consideration of mode of delivery did not include a consideration of an elective CS at any stage, by any of the doctors involved.</td>
+                    </tr>
+            
+                    <tr>
+                        <td>House of Commons</td>
+                        <td>Inadequate maternity care</td>
+                        <td style="background-color: #F3E5F5;">#F3E5F5</td>
+                        <td>maternity</td>
+                        <td>I am told that the Badgernet maternity system implemented in October 2021 will resolve the problems relating to mode and timing of birth, in that the system will require a consultant to approve a decision for CS/induction of labour (IOL) and that IOL's will not be approved by the labour ward coordinator unless the paper booking has been approved on paper.</td>
+                    </tr>
+            
+                    <tr>
+                        <td>House of Commons</td>
+                        <td>Fragmented care + House of Commons_Socioeconomic factors and deprivation</td>
+                        <td style="background-color: #FFECB3;">#FFECB3</td>
+                        <td>clear + factors</td>
+                        <td>However, on the evidence received it is not clear how this will assist if the risk factors and the need to consider IOL/elective CS have not been identified, by junior staff, thus triggering the need for escalation to/approval by a consultant.</td>
+                    </tr>
+            
+                    <tr>
+                        <td>House of Commons</td>
+                        <td>Fragmented care + House of Commons_Socioeconomic factors and deprivation</td>
+                        <td style="background-color: #FFECB3;">#FFECB3</td>
+                        <td>clear + factors</td>
+                        <td>I am not clear what has been done to ensure that junior doctors and locums have sufficient technical knowledge to ensure that they are able to identify serious risk factors and alert the consultant to these, so that the consultant may consider the appropriate mode of delivery.</td>
+                    </tr>
+            
+                    <tr>
+                        <td>House of Commons</td>
+                        <td>Guidance gaps + I-SIRch_Person - Patient (characteristics and performance) - Characteristics - Training and education (e.g., attendance at ante-natal classes)</td>
+                        <td style="background-color: #E1F5FE;">#E1F5FE</td>
+                        <td>information + training</td>
+                        <td>No information was provided as to the availability of regular face to face training for all grades concerning high-risk pregnancies not just for career trainees and foundation doctors.</td>
+                    </tr>
+            
+                    <tr>
+                        <td>House of Commons</td>
+                        <td>Guidance gaps</td>
+                        <td style="background-color: #E1F5FE;">#E1F5FE</td>
+                        <td>information</td>
+                        <td>I am told that a memo was sent to all junior doctors reminding them that any plan for either IOL or elective CS must be approved by a consultant and that an induction pack containing that information is provided to new starters and locums.</td>
+                    </tr>
+            
+                    <tr>
+                        <td>I-SIRch</td>
+                        <td>Person - Patient (characteristics and performance) - Characteristics - Training and education (e.g., attendance at ante-natal classes)</td>
+                        <td style="background-color: #D1E7DD;">#D1E7DD</td>
+                        <td>education</td>
+                        <td>I have seen the Women's and Children Clinical Education Guideline introduced in November 2022.</td>
+                    </tr>
+            
+                    <tr>
+                        <td>House of Commons</td>
+                        <td>Guidance gaps</td>
+                        <td style="background-color: #E1F5FE;">#E1F5FE</td>
+                        <td>information</td>
+                        <td>I am told that the information was placed in a prominent position on notice boards, staff rooms and in blogs.</td>
+                    </tr>
+            
+                    <tr>
+                        <td>House of Commons</td>
+                        <td>Fragmented care</td>
+                        <td style="background-color: #FFECB3;">#FFECB3</td>
+                        <td>clear</td>
+                        <td>It is not clear how the assimilation of this knowledge is tested.</td>
+                    </tr>
+            
+                    <tr>
+                        <td>House of Commons</td>
+                        <td>Fragmented care + House of Commons_Guidance gaps + House of Commons_Inadequate maternity care + House of Commons_Socioeconomic factors and deprivation + I-SIRch_Jobs/Task - Care planning</td>
+                        <td style="background-color: #FFECB3;">#FFECB3</td>
+                        <td>care + information + care + factors + care</td>
+                        <td>In any event it seems these methods of dissemination of information and the appraisal system were in place at the time of Eclipse's birth but did not ensure that the doctors involved in her mother's care appreciated the impact of the risk factors in this pregnancy.</td>
+                    </tr>
+            
+                    <tr>
+                        <td>I-SIRch</td>
+                        <td>Jobs/Task - Care planning</td>
+                        <td style="background-color: #FFD580;">#FFD580</td>
+                        <td>planning</td>
+                        <td>It was not explained how Badgernet or any policy or procedure in place, would ensure that there is a holistic review (including ultrasound scan findings) when planning for timing and mode of birth.</td>
+                    </tr>
+            
+                    <tr>
+                        <td>House of Commons</td>
+                        <td>Care quality and access issues</td>
+                        <td style="background-color: #FFF3E0;">#FFF3E0</td>
+                        <td>access</td>
+                        <td>Access to Badgernet portal / full implementation of the Badgernet software It seems that the Badgernet system is being relied on to address a number of issues which were identified in this case, and heavy reliance is being placed on a system which is not yet fully implemented.</td>
+                    </tr>
+            
+                    <tr>
+                        <td>House of Commons</td>
+                        <td>Care quality and access issues</td>
+                        <td style="background-color: #FFF3E0;">#FFF3E0</td>
+                        <td>access</td>
+                        <td>The concern remains that a critical aspect of this system, access to the portal, will not be in place until autumn of 2023 at the earliest. 3.</td>
+                    </tr>
+            
+                    <tr>
+                        <td>House of Commons</td>
+                        <td>Care quality and access issues + I-SIRch_Person - Patient (characteristics and performance) - Characteristics - Record of attendance (e.g., failure to attend antenatal classes)</td>
+                        <td style="background-color: #FFF3E0;">#FFF3E0</td>
+                        <td>quality + record</td>
+                        <td>Quality Assessment I am informed that Badgernet can easily identify fields which have not been completed and will prevent a record being closed until the field is completed, but it cannot identify the quality of any such entries.</td>
+                    </tr>
+            
+                    <tr>
+                        <td>House of Commons</td>
+                        <td>Care quality and access issues</td>
+                        <td style="background-color: #FFF3E0;">#FFF3E0</td>
+                        <td>quality</td>
+                        <td>I am told that the quality checks are made on ten sets of notes per month out of an estimated 3,000 records that will be open at any one time.</td>
+                    </tr>
+            
+                    <tr>
+                        <td>House of Commons</td>
+                        <td>Care quality and access issues</td>
+                        <td style="background-color: #FFF3E0;">#FFF3E0</td>
+                        <td>quality</td>
+                        <td>The concern remains that there is insufficient quality assurance in this system. 4.</td>
+                    </tr>
+            
+                    <tr>
+                        <td>House of Commons</td>
+                        <td>Fragmented care</td>
+                        <td style="background-color: #FFECB3;">#FFECB3</td>
+                        <td>clear</td>
+                        <td>The concern remains that there is no clear plan in place to ensure mothers receive the support they require to make fully informed decisions in relation to mode of delivery where there is risk of shoulder dystocia. 6.</td>
+                    </tr>
+            
+                    <tr>
+                        <td>Extended Analysis</td>
+                        <td>Diagnostic Testing and Specimen Handling + House of Commons_Care quality and access issues + House of Commons_Fragmented care + House of Commons_Inadequate maternity care + I-SIRch_Jobs/Task - Care planning</td>
+                        <td style="background-color: #D1ECF1;">#D1ECF1</td>
+                        <td>interpretation + treatment + care + care + care</td>
+                        <td>Interpretation of Montgomery Ante-natal care is unique in that decisions have to be made for the benefit of two patients (the mother and the baby) and the treatment options for each may, as in this case have competing risks and benefits.</td>
+                    </tr>
+            
+                    <tr>
+                        <td>House of Commons</td>
+                        <td>Fragmented care + House of Commons_Inadequate maternity care + I-SIRch_Jobs/Task - Care planning</td>
+                        <td style="background-color: #FFECB3;">#FFECB3</td>
+                        <td>care + care + care</td>
+                        <td>In addition, in ante-natal care, the circumstances may change and action may need to be taken very quickly.</td>
+                    </tr>
+            
+                    <tr>
+                        <td>House of Commons</td>
+                        <td>Socioeconomic factors and deprivation</td>
+                        <td style="background-color: #E0F7FA;">#E0F7FA</td>
+                        <td>factors</td>
+                        <td>It was acknowledged in evidence that parents often want a steer as to the best/safest course of action and that may require medical professionals to express opinions as to the weight to be placed on different risk factors.</td>
+                    </tr>
+            
+                    <tr>
+                        <td>House of Commons</td>
+                        <td>Guidance gaps + I-SIRch_Organisation - National and/or local guidance + I-SIRch_Person - Patient (characteristics and performance) - Characteristics - Training and education (e.g., attendance at ante-natal classes)</td>
+                        <td style="background-color: #E1F5FE;">#E1F5FE</td>
+                        <td>guidance + guidance + training</td>
+                        <td>The way in which Montgomery is interpreted and the extent to which medical professionals can offer an opinion is of wider concern than just the actions of those at GEH and should be considered by those who produce the guidance and deliver training to medical professionals.</td>
+                    </tr>
+            
+                </tbody>
+            </table>
+        </body>
+        </html>
+        
+                        </div>
+                    </div>
+                    
+            </body>
+            </html>
+            
